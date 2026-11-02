@@ -1,0 +1,26 @@
+task: text-classification
+model:
+  name: google/bert_uncased_L-2_H-128_A-2
+  revision: main
+  max_length: 96
+data:
+  train_file: sample_data/hf_classification/train.jsonl
+  validation_file: sample_data/hf_classification/validation.jsonl
+train:
+  learning_rate: 0.00005
+  weight_decay: 0.01
+  batch_size: 2
+  max_steps: 12
+  eval_steps: 3
+  seed: 42
+monitor:
+  min_evaluations: 3
+  patience: 2
+  min_delta: 0.01
+  generalization_gap: 0.2
+  underfit_loss_floor: 6.0
+  flat_window: 3
+  flat_threshold: 0.001
+  loss_spike_ratio: 2.0
+  loss_spike_patience: 2
+  grad_norm_warning: 1000.0

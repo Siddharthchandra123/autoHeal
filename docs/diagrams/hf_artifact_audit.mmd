@@ -1,0 +1,24 @@
+flowchart TD
+    A["Completed CPU LoRA Run"] --> B["Load run plan + result receipt"]
+    B --> C{"Matching model, config and dataset hashes?"}
+    C -->|No| X["BLOCK - Investigate mismatch"]
+    C -->|Yes| D["SHA-256 final adapter verification"]
+    D --> E{"Adapter intact?"}
+    E -->|No| X
+    E -->|Yes| F["SHA-256 Trainer checkpoint verification"]
+    F --> G{"Weights, optimizer, scheduler, RNG intact?"}
+    G -->|No| X
+    G -->|Yes| H["Offline artifact audit passed"]
+    H --> I{"Request fresh inference?"}
+    I -->|Yes| J["Reload base model + LoRA adapter"]
+    J --> K["Generate 8 deterministic tokens"]
+    I -->|No| L["Stop - no additional downloads"]
+    K --> M["Adapter load/inference checked"]
+    M --> N["Optimizer resume still separate test"]
+    L --> N
+    classDef check fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    class A,B,C,D,E,F,G,I,J,K check
+    class H,L,M,N good
+    class X bad

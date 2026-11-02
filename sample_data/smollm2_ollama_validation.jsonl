@@ -1,0 +1,4 @@
+{"text": "<|im_start|>user\nWhat is train validation leakage?<|im_end|>\n<|im_start|>assistant\nIt occurs when information from validation examples enters training and biases evaluation.<|im_end|>"}
+{"text": "<|im_start|>user\nCan MLflow detect security vulnerabilities alone?<|im_end|>\n<|im_start|>assistant\nNo. MLflow tracks experiments; dedicated security scanners and policies are needed.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy should a LoRA adapter match its base model?<|im_end|>\n<|im_start|>assistant\nAdapters depend on the weight architecture and tensor layout of the original base model.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy should we limit automatic retries?<|im_end|>\n<|im_start|>assistant\nRetry limits control compute costs and avoid endless training loops.<|im_end|>"}

@@ -1,0 +1,16 @@
+{"text": "<|im_start|>user\nWhat does MLflow track?<|im_end|>\n<|im_start|>assistant\nMLflow records experiment parameters, metrics, and artifacts for comparison.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is overfitting?<|im_end|>\n<|im_start|>assistant\nOverfitting occurs when a model learns training-specific patterns and generalizes poorly.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is underfitting?<|im_end|>\n<|im_start|>assistant\nUnderfitting happens when a model fails to learn useful patterns even from its training examples.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy use a validation split?<|im_end|>\n<|im_start|>assistant\nValidation data estimates how well a training configuration generalizes to held-out examples.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat does LoRA do?<|im_end|>\n<|im_start|>assistant\nLoRA trains small low-rank adapter matrices while most original model weights stay frozen.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is a learning rate?<|im_end|>\n<|im_start|>assistant\nLearning rate controls the size of parameter updates during optimization.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy stop training early?<|im_end|>\n<|im_start|>assistant\nEarly stopping prevents wasting compute when validation results stop improving.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is a checkpoint?<|im_end|>\n<|im_start|>assistant\nA checkpoint captures model state and may include optimizer, scheduler, and RNG state for resuming.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy verify SHA-256?<|im_end|>\n<|im_start|>assistant\nSHA-256 helps detect modifications to an artifact relative to an expected digest.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is a gradient norm?<|im_end|>\n<|im_start|>assistant\nA gradient norm measures the magnitude of gradients during parameter updates.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is a training epoch?<|im_end|>\n<|im_start|>assistant\nAn epoch is one pass over the training dataset.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is a model registry?<|im_end|>\n<|im_start|>assistant\nA model registry manages model versions, metadata, and promotion states.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is Ollama used for?<|im_end|>\n<|im_start|>assistant\nOllama runs compatible language models locally for inference.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat is GGUF?<|im_end|>\n<|im_start|>assistant\nGGUF is a model format used by llama.cpp and Ollama to load model tensors and metadata.<|im_end|>"}
+{"text": "<|im_start|>user\nWhat does the AutoTune AI recovery controller do?<|im_end|>\n<|im_start|>assistant\nIt stops unsafe training attempts, validates adjustments, and schedules bounded retries.<|im_end|>"}
+{"text": "<|im_start|>user\nWhy must we keep a test set separate?<|im_end|>\n<|im_start|>assistant\nA held-out test set gives a less biased final estimate after hyperparameter selection.<|im_end|>"}

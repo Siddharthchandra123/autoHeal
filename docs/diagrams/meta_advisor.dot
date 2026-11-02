@@ -1,0 +1,26 @@
+digraph meta_advisor {
+  rankdir=LR;
+  bgcolor="transparent";
+  graph [fontname="DejaVu Sans", nodesep=0.38, ranksep=0.40, pad=0.10, splines=ortho];
+  node [shape=box, style="rounded,filled", color="#5371ad", fillcolor="#eaf0ff", fontcolor="#21345c", fontname="DejaVu Sans", fontsize=10, margin="0.15,0.12"];
+  edge [color="#64748b", arrowsize=0.65];
+  trial [label="Verified stopped trial\ncheckpoint receipt", fillcolor="#e5f4ec", color="#178654"];
+  summary [label="Numeric-only metrics\nallowlisted parameters", fillcolor="#e5f4ec", color="#178654"];
+  provider [label="Provider choice", shape=diamond, fillcolor="#fff5dc", color="#c27c10"];
+  mock [label="Offline mock\nadvisor"];
+  meta [label="Opt-in Meta\nMuse Spark API"];
+  schema [label="Strict JSON\nparser", fillcolor="#fff5dc", color="#c27c10"];
+  policy [label="Policy approval", shape=diamond, fillcolor="#fff5dc", color="#c27c10"];
+  fallback [label="Deterministic\nfallback"];
+  record [label="SHA-256 bound\nadvice record", fillcolor="#e5f4ec", color="#178654"];
+  next [label="Next bounded\ntraining attempt", fillcolor="#e5f4ec", color="#178654"];
+  stop [label="Block for review", fillcolor="#ffe5e5", color="#b33838"];
+  trial -> summary -> provider;
+  provider -> mock -> schema;
+  provider -> meta -> schema;
+  schema -> policy;
+  policy -> record;
+  policy -> fallback -> record;
+  policy -> stop;
+  record -> next;
+}

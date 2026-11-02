@@ -1,0 +1,17 @@
+flowchart TD
+  CLI[Windows CLI / Offline Preflight] --> ORCH[Phase 5E Controller]
+  ORCH --> T1[Trial 01 - Real HF LoRA CPU Trainer]
+  T1 --> MON[Live paired loss monitoring]
+  MON --> STOP{Overfit or Underfit?}
+  STOP -->|No| VERIFY[Verify Adapter and Trainer Checkpoint]
+  STOP -->|Yes| CKPT[Safe Stop and Save]
+  CKPT --> VERIFY
+  VERIFY --> GATE{Diagnosis and Retry Budget}
+  GATE -->|Eligible| AI[Meta/Mock Advisor]
+  AI --> POLICY[Strict Parameter Policy]
+  POLICY --> CFG[Version New YAML]
+  CFG --> T2[Trial 02 - Fresh Training Run]
+  T2 --> VERIFY2[Verify Real Artifacts]
+  VERIFY2 --> PICK[Compare Validation Loss]
+  GATE -->|Not Eligible| PICK
+  PICK --> LOG[Journal + Final Receipt]

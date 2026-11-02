@@ -1,0 +1,20 @@
+flowchart TD
+    U[Engineer / Windows VS Code] --> P[Offline LoRA Preflight]
+    P --> C{License + GPU + dependencies ready?}
+    C -- No --> X[STOP: fix environment / access]
+    C -- Yes --> G[Hugging Face Model Hub / pinned base]
+    P --> H[Dataset SHA256 / split leakage check]
+    G --> T[GPU PyTorch + PEFT LoRA / optional QLoRA]
+    H --> T
+    T --> L[Trainer evaluation interval]
+    L --> M[Phase 2 MonitorStream]
+    M -->|continue| T
+    M -->|stop| S[Graceful save + best checkpoint]
+    L --> S
+    S --> V[Hash manifest: adapter + optimizer + scheduler + RNG]
+    V --> Q{Verified?}
+    Q -- No --> B[BLOCK / manual investigation]
+    Q -- Yes --> A[Best adapter + verified manifest]
+    A --> R[Explicit adapter reload smoke]
+    R --> F[Human review, no auto deployment]
+    R -. Future Phase 6/7 .-> K[MLflow + Kubeflow reconciliation]

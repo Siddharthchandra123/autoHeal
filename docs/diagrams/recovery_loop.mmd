@@ -1,0 +1,18 @@
+flowchart TD
+  START([Start training attempt]) --> METRIC[Record train/validation metrics]
+  METRIC --> STATUS{Enough evidence?}
+  STATUS -->|No| METRIC
+  STATUS -->|Yes - healthy| CONT[Continue until objective or budget end]
+  CONT --> FINAL[Independent holdout evaluation]
+  STATUS -->|Overfit / underfit / divergence| STOP[Gracefully stop and preserve best checkpoint]
+  STOP --> DIAG[Meta advisor proposes a bounded remediation]
+  DIAG --> CHECK{Deterministic policy accepts?}
+  CHECK -->|No| HUMAN[Escalate / halt]
+  CHECK -->|Yes| BUDGET{Attempts and budget left?}
+  BUDGET -->|No| HUMAN
+  BUDGET -->|Yes| PATCH[Version and test training config]
+  PATCH --> RESTART[New isolated training attempt]
+  RESTART --> METRIC
+  FINAL --> PROMO{Promotion criteria passed?}
+  PROMO -->|Yes| REG[Register model with approval]
+  PROMO -->|No| HUMAN

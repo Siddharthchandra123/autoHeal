@@ -1,0 +1,4 @@
+{"text":"Instruction: Explain gradient descent. Response: Gradient descent iteratively updates model parameters to reduce a loss function."}
+{"text":"Instruction: What is a learning rate? Response: A learning rate controls the size of updates to a model's weights."}
+{"text":"Instruction: Define overfitting. Response: Overfitting occurs when a model learns training-specific patterns that fail to generalize."}
+{"text":"Instruction: Define underfitting. Response: Underfitting occurs when a model does not learn useful patterns even on the training data."}

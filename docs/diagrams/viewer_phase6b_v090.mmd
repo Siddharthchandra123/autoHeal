@@ -1,0 +1,8 @@
+flowchart LR
+    U[Browser on localhost 3000] --> N[Next.js TypeScript read-only UI]
+    N -->|GET only| A[FastAPI Viewer 127.0.0.1 8000]
+    A -->|MLflow SDK reads| M[MLflow Server 127.0.0.1 5000]
+    M --> DB[(SQLite Tracking Database)]
+    M --> S[(Local Artifacts)]
+    T[Existing Self-Healing Controller] -->|Write Experiment Metadata| M
+    T --> L[Hugging Face CPU PEFT Trainer]

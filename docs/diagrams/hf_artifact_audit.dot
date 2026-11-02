@@ -1,0 +1,18 @@
+digraph hf_audit {
+  graph [rankdir=TB, bgcolor="transparent", nodesep=0.20, ranksep=0.35, fontname="DejaVu Sans"];
+  node [shape=box, style="rounded,filled", fillcolor="#e8f0ff", color="#4071bb", fontname="DejaVu Sans", fontsize=10, margin="0.15,0.09"];
+  edge [color="#66758c", arrowsize=0.65, fontsize=9, fontname="DejaVu Sans"];
+  run [label="Completed CPU LoRA run"];
+  plan [label="Read plan + result receipt"];
+  provenance [label="Verify config, dataset and model identity"];
+  adapter [label="Verify LoRA adapter files (SHA-256)"];
+  chk [label="Verify full checkpoint: weights + optimizer\n+ scheduler + RNG (SHA-256)"];
+  ok [label="OFFLINE ARTIFACT AUDIT PASS", fillcolor="#dcfce7", color="#16834a"];
+  reload [label="Optional fresh base + adapter reload\nand eight-token inference smoke"];
+  remaining [label="Separate acceptance gate: real optimizer resume\nand agent-driven HF retry", fillcolor="#fff1d8", color="#b17d12"];
+  fail [label="Mismatch / corruption -> BLOCK", fillcolor="#fee2e2", color="#dc2626"];
+  run -> plan -> provenance -> adapter -> chk -> ok -> reload -> remaining;
+  provenance -> fail [label="invalid", style="dashed"];
+  adapter -> fail [label="corrupt", style="dashed"];
+  chk -> fail [label="incomplete", style="dashed"];
+}

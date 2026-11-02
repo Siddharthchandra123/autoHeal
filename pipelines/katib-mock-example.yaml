@@ -1,0 +1,47 @@
+# Katib example for the synthetic CPU harness. Replace the image with your pushed image.
+# Do NOT interpret this trial's losses as real AI training metrics.
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  name: autotune-ai-mock
+  namespace: kubeflow
+spec:
+  parallelTrialCount: 2
+  maxTrialCount: 6
+  maxFailedTrialCount: 2
+  objective:
+    type: minimize
+    objectiveMetricName: val_loss
+  algorithm:
+    algorithmName: random
+  parameters:
+    - name: learning_rate
+      parameterType: double
+      feasibleSpace: {min: "0.00001", max: "0.00020"}
+    - name: lora_dropout
+      parameterType: double
+      feasibleSpace: {min: "0.02", max: "0.25"}
+  metricsCollectorSpec:
+    collector:
+      kind: StdOut
+  trialTemplate:
+    primaryContainerName: training
+    trialParameters:
+      - name: learningRate
+        description: Learning rate
+        reference: learning_rate
+      - name: loraDropout
+        description: LoRA dropout
+        reference: lora_dropout
+    trialSpec:
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: training
+                image: registry.example.com/autotune-ai:0.1.0
+                command: ["python", "-m", "autotune.katib_trial"]
+                args: ["--learning-rate", "${trialParameters.learningRate}", "--lora-dropout", "${trialParameters.loraDropout}"]

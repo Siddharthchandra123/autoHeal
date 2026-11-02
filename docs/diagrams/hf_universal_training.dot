@@ -1,0 +1,18 @@
+digraph hf_universal_training {
+  graph [rankdir=TB, bgcolor="white", splines=polyline, pad="0.2", nodesep="0.36", ranksep="0.58"];
+  node [shape=box, style="rounded,filled", fillcolor="#EAF2FF", color="#2A579B", fontcolor="#173B73", fontname="DejaVu Sans", fontsize=11, margin="0.14,0.10"];
+  edge [color="#7891B0", arrowsize=0.7];
+  Input [label="Model ID + task\nvalidated offline"];
+  Route [label="Task adapter", shape=diamond, fillcolor="#FFF0C7", color="#B7802A"];
+  LoRA [label="Causal LM\nLoRA / PEFT"];
+  Classify [label="CPU text\nclassification"];
+  Metrics [label="Train / validation\nloss + task metrics", fillcolor="#E0F5EA", color="#248A65"];
+  Monitor [label="AutoTune\nMonitorStream", fillcolor="#E0F5EA", color="#248A65"];
+  Decision [label="Stop?", shape=diamond, fillcolor="#FFF0C7", color="#B7802A"];
+  Continue [label="Continue + select\nbest checkpoint", fillcolor="#E0F5EA", color="#248A65"];
+  Stop [label="Stop + preserve\ncheckpoint", fillcolor="#FCE6E6", color="#B33A3A"];
+  Manifest [label="Hash manifest\n+ audit events", fillcolor="#F2ECFF", color="#7548AA"];
+  Future [label="Future: Meta + MLflow\n+ Kubeflow retry", style="rounded,dashed", fillcolor="#F7F8FB", color="#7E8799"];
+  Input -> Route; Route -> LoRA; Route -> Classify; LoRA -> Metrics; Classify -> Metrics; Metrics -> Monitor; Monitor -> Decision;
+  Decision -> Continue; Decision -> Stop; Continue -> Manifest; Stop -> Manifest; Manifest -> Future [style=dashed];
+}

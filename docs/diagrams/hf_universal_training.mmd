@@ -1,0 +1,13 @@
+flowchart LR
+  A[Validated Model ID and Task] --> B{Task Adapter}
+  B -->|causal-lm| C[PEFT LoRA Trainer]
+  B -->|text-classification| D[CPU Classification Trainer]
+  C --> E[Training and Evaluation Metrics]
+  D --> E
+  E --> F[AutoTune Monitor]
+  F --> G{Stop Condition?}
+  G -->|No| H[Continue and Save Best]
+  G -->|Yes| I[Stop and Preserve Checkpoint]
+  H --> J[Integrity Manifest and Audit]
+  I --> J
+  J -.-> K[Future: Recovery Agent, MLflow and Kubeflow]

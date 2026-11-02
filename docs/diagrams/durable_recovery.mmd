@@ -1,0 +1,27 @@
+flowchart TD
+    A[Validated baseline config] --> B[Allocate experiment ID and atomic journal]
+    B --> C[Acquire exclusive local lock]
+    C --> D{Prior attempt status?}
+    D -->|No attempt| E[Create numbered attempt]
+    D -->|Completed| P[Verify best receipt and checksum]
+    D -->|Stopped or manually abandoned| E
+    D -->|RUNNING and receipt present| F[Validate receipt and checkpoint SHA256]
+    D -->|RUNNING and no receipt| X[BLOCK: no silent rerun]
+    F -->|Valid| G[Commit prior result once]
+    F -->|Invalid| X
+    G --> D
+    E --> H[Persist RUNNING before trainer starts]
+    H --> I[CPU synthetic trainer plus monitor]
+    I --> J[Write simulated checkpoint metadata]
+    J --> K[Atomic completion receipt]
+    K --> L[Verify and commit result]
+    L --> M{Training outcome?}
+    M -->|Completed| P
+    M -->|Overfit or underfit| N{Approved patch and retry budget?}
+    M -->|Divergence / unknown| X
+    N -->|Yes| E
+    N -->|No approved patch| X
+    N -->|Budget exhausted| P
+    P --> Q[active.yaml: best verified config]
+    Q --> R[Experiment terminal state; no automatic deployment]
+    X --> S[Operator inspects and resolves]

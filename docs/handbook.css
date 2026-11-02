@@ -1,0 +1,35 @@
+@page { size: A4; margin: 16mm 16mm 18mm 16mm; @bottom-left { content: "AutoTune AI  |  Living Handbook v0.8.2"; font-size: 8pt; color: #64748b; } @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size:8pt; color: #64748b; } }
+@font-face { font-family: "DejaVu Sans"; src: local("DejaVu Sans"); }
+html { font-family: "DejaVu Sans", Arial, sans-serif; color: #1d2939; font-size: 9.1pt; }
+body { line-height: 1.46; }
+h1 { color: #163b72; font-size: 18.5pt; margin-top: 20pt; margin-bottom: 7pt; padding-bottom: 5pt; border-bottom: 1pt solid #c9d8e8; page-break-after: avoid; }
+h2 { color: #174a7e; font-size: 12.5pt; margin-top: 15pt; margin-bottom: 6pt; page-break-after: avoid; }
+h3 { color: #2e5f8d; font-size: 10.3pt; margin-top: 10pt; margin-bottom: 4pt; page-break-after: avoid; }
+p { margin: 5pt 0 7pt; orphans: 3; widows: 3; }
+strong { color: #1e3352; }
+a { color: #1a5f9d; text-decoration: none; overflow-wrap: anywhere; }
+li { margin: 3pt 0; }
+ul, ol { padding-left: 18pt; margin-top: 3pt; }
+table { border-collapse: collapse; width: 100%; font-size: 7.65pt; margin: 7pt 0 11pt; table-layout: auto; }
+th { background: #eaf2fb; color: #173a62; text-align: left; border-bottom: 1.2pt solid #a3bad1; padding: 6pt 5pt; }
+td { padding: 5pt 5pt; border-bottom: 0.6pt solid #dce5ed; vertical-align: top; }
+tr:nth-child(even) td { background: #f8fbfd; }
+tr { break-inside: avoid; }
+pre { background: #f2f5f9; border-left: 3pt solid #4c79aa; padding: 8pt 8pt; font-family: monospace; font-size: 7.7pt; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; break-inside: avoid; }
+code { font-family: monospace; font-size: 8.2pt; }
+img { display: block; margin: 10pt auto; max-width: 100%; height: auto; }
+.diagram { max-height: 192mm; object-fit: contain; }
+figure { margin: 9pt auto; break-inside: avoid; }
+figcaption { font-size: 8pt; color: #667085; text-align: center; margin-top: 4pt; }
+blockquote { border-left: 3pt solid #4c79aa; margin: 9pt 0; padding: 8pt 10pt; background: #f6f9fd; }
+.note { border-left: 4pt solid #2b79aa; background: #ecf5fb; padding: 10pt 11pt; margin: 10pt 0; }
+.cover { height: 240mm; padding: 31mm 9mm 0; box-sizing: border-box; background: #f6f9fd; border-top: 11pt solid #225c98; border-bottom: 1pt solid #c5d8e9; }
+.cover .eyebrow { font-size: 10pt; letter-spacing: .16em; font-weight: bold; color: #3179b5; }
+.cover h1 { font-size: 41pt; color: #163b72; border: none; padding: 0; margin: 25mm 0 3mm; }
+.cover .cover-sub { font-size: 19pt; color: #3179b5; font-weight: bold; margin-bottom: 10mm; }
+.cover .cover-text { font-size: 12pt; max-width: 155mm; color: #475467; line-height: 1.65; }
+.cover .cover-meta { display: flex; gap: 20pt; margin-top: 26mm; border-top: 1pt solid #d1dee9; padding-top: 10pt; color: #334155; font-size: 9pt; }
+.cover .cover-meta span { display: inline-block; }
+.cover .cover-note { margin-top: 19mm; font-size: 9pt; color: #64748b; }
+.page-break { page-break-after: always; }
+.footer-note { padding-top: 8pt; border-top: 1pt solid #cbd5e1; color: #64748b; font-size: 8pt; margin-top: 20pt; }

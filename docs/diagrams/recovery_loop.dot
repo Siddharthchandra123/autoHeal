@@ -1,0 +1,24 @@
+digraph Recovery {
+  graph [bgcolor="transparent", rankdir=TB, nodesep=.30, ranksep=.38, pad=.14];
+  node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", color="#A8BBD0", fillcolor="#F0F5FD", margin="0.15,0.09"];
+  edge [color="#64748B", penwidth=1.3, arrowsize=.65, fontsize=8, fontname="DejaVu Sans"];
+  start [label="Start bounded training attempt", fillcolor="#DCFCE7"];
+  met [label="Log train + validation metrics\nBest checkpoint metadata"];
+  diag [label="Enough evidence to diagnose?", shape=diamond, fillcolor="#FEF3C7"];
+  run [label="Continue training and evaluation", fillcolor="#DBEAFE"];
+  stop [label="Stop gracefully\nRetain best checkpoint", fillcolor="#FEE2E2"];
+  meta [label="Meta model proposes a fix\nFallback available", fillcolor="#EDE9FE"];
+  policy [label="Patch and budget policy accepts?", shape=diamond, fillcolor="#FEF3C7"];
+  restart [label="Version config + tests\nRestart isolated attempt", fillcolor="#DBEAFE"];
+  gate [label="Independent model quality gate\nNever auto-promote from val loss", fillcolor="#DCFCE7"];
+  human [label="Escalate or halt", fillcolor="#FEE2E2"];
+  start -> met -> diag;
+  diag -> run [label="healthy / insufficient"];
+  run -> gate [label="completed"];
+  diag -> stop [label="overfit / underfit / diverged"];
+  stop -> meta -> policy;
+  policy -> restart [label="approved"];
+  restart -> met [constraint=false, color="#7C3AED"];
+  policy -> human [label="rejected / exhausted"];
+  gate -> human [label="fails"];
+}

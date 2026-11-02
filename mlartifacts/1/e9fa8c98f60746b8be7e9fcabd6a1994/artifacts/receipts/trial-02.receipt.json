@@ -1,0 +1,9 @@
+{
+  "attempt": 2,
+  "best_checkpoint": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-02\\checkpoints\\checkpoint-2",
+  "best_val_loss": 10.365181922912598,
+  "config_sha256": "069cce048fb7f1dcb611248232a6a6a9758b8103763d1d5d049be5a8161d9ea8",
+  "fault_injected": false,
+  "final_adapter": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-02\\final_adapter",
+  "stop_diagnosis": null
+}

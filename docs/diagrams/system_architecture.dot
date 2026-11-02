@@ -1,0 +1,21 @@
+digraph Architecture {
+  graph [bgcolor="transparent", rankdir=TB, nodesep=.30, ranksep=.38, pad=.12];
+  node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", color="#A8BBD0", fillcolor="#F0F5FD", margin="0.14,0.09"];
+  edge [color="#64748B", penwidth=1.3, arrowsize=.65];
+  input [label="Training request + datasets\nBaseline YAML", fillcolor="#F2F5F9"];
+  validate [label="Configuration validation\n+ SHA256 identity"];
+  orch [label="Kubeflow Pipelines v2\nOrchestrator (planned)", fillcolor="#DBEAFE", color="#60A5FA"];
+  opt [label="HPO: Katib primary\nRay Tune optional alternative", fillcolor="#DBEAFE", color="#60A5FA"];
+  train [label="PyTorch / Meta Llama\nLoRA / QLoRA training", fillcolor="#DCFCE7", color="#86EFAC"];
+  metrics [label="Eval callbacks + MLflow\nmetrics and artifact tracking", fillcolor="#F0F5FD"];
+  detect [label="Deterministic health detector\nOverfit | Underfit | Diverged", fillcolor="#FEF3C7", color="#FBBF24"];
+  agent [label="Meta Muse advisor\nReasoning only", fillcolor="#EDE9FE", color="#C4B5FD"];
+  guard [label="Policy engine\nAllowlist + bounds + budget", fillcolor="#FEE2E2", color="#FDA4AF"];
+  restart [label="Versioned YAML + best checkpoint\nBounded restart (planned)", fillcolor="#EDE9FE", color="#C4B5FD"];
+  final [label="Independent holdout evaluation\nRegistry + approval gate (planned)", fillcolor="#DCFCE7", color="#86EFAC"];
+  input -> validate -> orch -> opt -> train -> metrics -> detect;
+  detect -> agent [label="abnormal", fontsize=8]; agent -> guard; detect -> guard [style=dashed, label="rules", fontsize=8];
+  guard -> restart [label="accepted", fontsize=8]; restart -> orch [constraint=false, color="#7C3AED", penwidth=1.7];
+  detect -> final [label="completed",fontsize=8];
+  {rank=same; agent; guard}
+}

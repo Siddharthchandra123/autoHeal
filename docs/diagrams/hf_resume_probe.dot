@@ -1,0 +1,18 @@
+digraph ResumeProbe {
+ graph [rankdir=TB, fontname="DejaVu Sans", bgcolor="transparent", nodesep=.36, ranksep=.5, margin=.15];
+ node [shape=box, style="rounded,filled", fillcolor="#E8F3FF", color="#4B80B5", penwidth=1.3, fontname="DejaVu Sans", fontsize=11, margin="0.15,0.10"];
+ edge [color="#607C96", arrowsize=.7, penwidth=1.3, fontname="DejaVu Sans", fontsize=9];
+ old [label="Completed CPU LoRA run\nREAD ONLY", fillcolor="#F3F5F9"];
+ new [label="New isolated resume probe\n4-step immutable plan"];
+ pause [label="Controlled pause at step 2\nSave full Trainer checkpoint", fillcolor="#FFF4DE", color="#BD8420"];
+ gate [shape=diamond, label="Run state +\nSHA manifest valid?", fillcolor="#FFEEE8", color="#B95A44"];
+ block [label="Block / inspect", fillcolor="#FCE7E7", color="#C65B5B"];
+ resume [label="Fresh Trainer invocation\nresume_from_checkpoint", fillcolor="#EBEAFE", color="#7665BD"];
+ inspect [label="At train begin: validate\nstep, optimizer, scheduler", fillcolor="#EBEAFE", color="#7665BD"];
+ finish [label="Training continues to step 4\nWrite resume_proof.json", fillcolor="#E5F8E8", color="#3E9863"];
+ next [label="Next: connect agentic\nreal-model recovery", fillcolor="#E5F8E8", color="#3E9863"];
+ old -> new -> pause -> gate;
+ gate -> block [label="No"];
+ gate -> resume [label="Yes"];
+ resume -> inspect -> finish -> next;
+}

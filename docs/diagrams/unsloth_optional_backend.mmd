@@ -1,0 +1,12 @@
+flowchart TB
+    A[AutoTune AI Request] --> B{Training backend}
+    B -->|CPU default| C[Hugging Face + PEFT]
+    B -->|GPU optional| D[Unsloth GPU SFT]
+    D --> E{GPU check}
+    E -->|No| F[Block safely]
+    E -->|Yes| G[LoRA / QLoRA]
+    C --> H[Shared metrics / monitor]
+    G --> H
+    H --> I[Best checkpoint + SHA-256]
+    I --> J[Meta advisor + policy]
+    J -.-> K[Future: verified retries and Kubeflow]

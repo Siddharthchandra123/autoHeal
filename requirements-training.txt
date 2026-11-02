@@ -1,0 +1,7 @@
+torch>=2.3
+transformers>=4.46,<6
+peft>=0.13
+accelerate>=1.0
+datasets>=3.0,<5
+safetensors>=0.4
+mlflow>=3,<5

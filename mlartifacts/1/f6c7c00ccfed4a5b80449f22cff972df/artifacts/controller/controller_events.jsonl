@@ -1,0 +1,9 @@
+{"event": "mlflow_controller_created", "run_id": "f6c7c00ccfed4a5b80449f22cff972df", "utc": "2026-11-02T08:23:17.657078+00:00"}
+{"attempt": 1, "config_sha256": "900eb8b026bd396a473bd7997205917aaba9bee377ad6dc75d9a0f614ef5c965", "event": "attempt_started", "utc": "2026-11-02T08:23:17.692764+00:00"}
+{"attempt": 1, "event": "mlflow_trial_created", "run_id": "dca1c1ac15d8498991fc40b2ddc98d6f", "utc": "2026-11-02T08:23:18.371534+00:00"}
+{"attempt": 1, "best_val_loss": 10.365182876586914, "event": "attempt_verified", "fault_injected": true, "stop_diagnosis": "overfit", "utc": "2026-11-02T08:23:43.730153+00:00"}
+{"attempt": 1, "event": "config_patch_approved", "fault_injected": true, "keys": ["learning_rate", "lora_dropout", "weight_decay"], "utc": "2026-11-02T08:23:44.543955+00:00"}
+{"attempt": 2, "config_sha256": "069cce048fb7f1dcb611248232a6a6a9758b8103763d1d5d049be5a8161d9ea8", "event": "attempt_started", "utc": "2026-11-02T08:23:44.563945+00:00"}
+{"attempt": 2, "event": "mlflow_trial_created", "run_id": "7f914d30a4214e4f9b15841453e341f7", "utc": "2026-11-02T08:23:45.176802+00:00"}
+{"attempt": 2, "best_val_loss": 10.365181922912598, "event": "attempt_verified", "fault_injected": false, "stop_diagnosis": null, "utc": "2026-11-02T08:23:51.596053+00:00"}
+{"best_trial": 2, "event": "controller_completed", "utc": "2026-11-02T08:23:52.216730+00:00"}

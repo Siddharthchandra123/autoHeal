@@ -1,0 +1,27 @@
+digraph UnslothIntegration {
+  rankdir=TB;
+  graph [bgcolor="white", pad=0.22, nodesep=0.32, ranksep=0.40, fontname="DejaVu Sans"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=12, penwidth=1.0, color="#98a2b3", fillcolor="#f4f7fb", fontcolor="#23334d", margin="0.20,0.11"];
+  edge [color="#7a8da7", arrowsize=0.7, fontsize=10, fontname="DejaVu Sans"];
+  ui [label="AutoTune AI CLI / Dashboard", fillcolor="#dceafa"];
+  select [label="Backend selection", shape=diamond, fillcolor="#fff1d4"];
+  hf [label="Hugging Face + PEFT\nCPU default", fillcolor="#d8f4e5"];
+  un [label="Unsloth FastLanguageModel + TRL\nGPU optional (experimental)", fillcolor="#ebdefa"];
+  check [label="CUDA / ROCm GPU detected?", shape=diamond, fillcolor="#fff1d4"];
+  block [label="No GPU: fail closed\nKeep CPU backend", fillcolor="#fee2e2"];
+  train [label="GPU LoRA / QLoRA trial", fillcolor="#ebdefa"];
+  monitor [label="Shared training metrics\nMonitorStream and early-stop", fillcolor="#d8f4e5"];
+  artifacts [label="Best checkpoint + SHA-256 manifests", fillcolor="#dceafa"];
+  agent [label="Meta advisor + policy guardrails", fillcolor="#ebdefa"];
+  future [label="FUTURE: live retries / Kubeflow", style="rounded,dashed,filled", fillcolor="#f4f7fb"];
+  ui -> select;
+  select -> hf [label="CPU"];
+  select -> un [label="GPU"];
+  un -> check;
+  check -> block [label="No"];
+  check -> train [label="Yes"];
+  hf -> monitor;
+  train -> monitor;
+  monitor -> artifacts -> agent;
+  agent -> future [style=dashed];
+}

@@ -1,0 +1,20 @@
+flowchart TB
+  C[AutoTune CPU self-healing controller] --> T1[Real HF LoRA trial 1]
+  C --> T2[Real HF LoRA trial 2, versioned config]
+  T1 --> A1[Local metrics, checkpoint, SHA256 manifest]
+  T2 --> A2[Local metrics, checkpoint, SHA256 manifest]
+  C --> P[MLflow parent controller run]
+  P --> R1[MLflow child trial 1]
+  P --> R2[MLflow child trial 2]
+  A1 -. selected metrics / hashes only .-> R1
+  A2 -. selected metrics / hashes only .-> R2
+  P --> UI[Local MLflow UI + SQLite backend]
+  R1 --> UI
+  R2 --> UI
+  C --> J[Authoritative local event journal + final receipt]
+  classDef current fill:#DDF2E5,stroke:#277C4B,color:#123D28
+  classDef tracking fill:#DDEAFB,stroke:#3268B0,color:#1B3F74
+  classDef storage fill:#FFF1CF,stroke:#A56A00,color:#6E4800
+  class C,T1,T2,A1,A2 current
+  class P,R1,R2,UI tracking
+  class J storage

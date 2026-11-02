@@ -1,0 +1,20 @@
+digraph phase6b {
+  graph [rankdir=LR, bgcolor="transparent", pad="0.24", nodesep="0.45", ranksep="0.65", fontname="DejaVu Sans", label="AutoTune AI | Phase 6B Local Experiment Viewer", labelloc="t", fontsize="22", fontcolor="#20324b"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize="12", color="#8aa9c4", fillcolor="#eff7fd", fontcolor="#1d3a52", penwidth=1.4, margin="0.20,0.15"];
+  edge [color="#3c7591", penwidth=1.7, arrowsize=.8, fontname="DejaVu Sans", fontsize="10", fontcolor="#4d6677"];
+  Browser [label="Browser\n127.0.0.1:3000", fillcolor="#eef5fc"];
+  Next [label="Next.js + TypeScript\nServer Components", fillcolor="#e7f1fe"];
+  FastAPI [label="FastAPI read-only\n127.0.0.1:8000",fillcolor="#dbf5ea",color="#4c987c"];
+  MLflow [label="MLflow Tracking\n127.0.0.1:5000",fillcolor="#fff2da",color="#bf9553"];
+  SQLite [shape=cylinder,label="SQLite metadata",fillcolor="#f4f0fe",color="#a099c5"];
+  Artifacts [shape=folder,label="Local artifact store",fillcolor="#f4f0fe",color="#a099c5"];
+  Controller [label="AutoTune CPU\nRecovery Controller",fillcolor="#e5f6ee",color="#4c987c"];
+  Trainer [label="HF + PEFT\nCPU trainer",fillcolor="#e5f6ee",color="#4c987c"];
+  Browser -> Next [label="pages"];
+  Next -> FastAPI [label="GET only"];
+  FastAPI -> MLflow [label="read SDK"];
+  MLflow -> SQLite;
+  MLflow -> Artifacts;
+  Controller -> MLflow [label="existing lineage"];
+  Controller -> Trainer [label="training"];
+}

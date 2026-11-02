@@ -1,0 +1,351 @@
+"""Phase 5B: optional single-device Hugging Face + PEFT LoRA trainer.
+
+IMPORTANT: This module is not used by the v0.6 tiny-GRU recovery loop.
+Live Meta gated-repo access, real GPU, and QLoRA require separate validation.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+import json
+import math
+import os
+from pathlib import Path
+
+from .config import load_config
+from .lora_contract import LoraContractError, make_plan, verify_manifest, write_manifest, _write_json_atomic
+from .metrics import MonitorStream
+
+
+def _log_jsonl(path: Path, row: dict) -> None:
+    safe = {}
+    nonfinite = []
+    for k, v in row.items():
+        if isinstance(v, float) and not math.isfinite(v):
+            safe[k] = None
+            nonfinite.append(k)
+        else:
+            safe[k] = v
+    if nonfinite:
+        safe['nonfinite_metrics'] = nonfinite
+    safe['timestamp_utc'] = datetime.now(timezone.utc).isoformat()
+    with path.open('a', encoding='utf8') as out:
+        out.write(json.dumps(safe, sort_keys=True, allow_nan=False) + '\n')
+
+
+def _lock(root: Path):
+    """Single local process lock; never automatically clear a stale lock."""
+    lock = root / '.lora_runner.lock'
+    try:
+        fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise LoraContractError(f'Run is locked: {lock}. Inspect processes before removing it.') from exc
+    with os.fdopen(fd, 'w') as handle:
+        handle.write(str(os.getpid()) + '\n')
+    return lock
+
+
+def _gpu_mode(plan: dict, *, explicit_cpu: bool) -> None:
+    import torch
+    if plan['device'] == 'gpu' and not torch.cuda.is_available():
+        raise LoraContractError('No CUDA/ROCm device visible to PyTorch. Use supported remote GPU or CPU-only tiny model.')
+    if plan['device'] == 'cpu' and not explicit_cpu:
+        raise LoraContractError('CPU HF training requires explicit --allow-cpu for small public smoke models')
+    if plan['quantization'] == '4bit' and not torch.cuda.is_available():
+        raise LoraContractError('QLoRA 4bit needs a compatible GPU plus bitsandbytes backend')
+
+
+def _build_collator(tokenizer):
+    """Pad sequences while masking only actual padding, NOT real EOS tokens."""
+    import torch
+
+    def collate(features):
+        batch = tokenizer.pad(features, padding=True, return_tensors='pt')
+        labels = batch['input_ids'].clone()
+        labels[batch['attention_mask'] == 0] = -100
+        batch['labels'] = labels
+        return batch
+    return collate
+
+
+def run_lora(config_path: str, output: str, *, resume_checkpoint: str | None = None,
+             allow_cpu: bool = False, pause_after_step: int | None = None,
+             injected_diagnosis: str | None = None) -> dict:
+    """Run only when explicitly requested by CLI `--execute`. No auto-retry.
+
+    A verified Trainer checkpoint stores optimizer/scheduler/RNG state. A final
+    adapter stores only model adaptation weights and is not a training resume.
+    """
+    if injected_diagnosis not in (None, 'overfit'):
+        raise LoraContractError('Only an explicitly labeled overfit fault injection is supported')
+    if injected_diagnosis is not None and (pause_after_step is not None or resume_checkpoint is not None):
+        raise LoraContractError('Fault injection cannot be combined with checkpoint pause/resume')
+    plan = make_plan(config_path)
+    _gpu_mode(plan, explicit_cpu=allow_cpu)
+    # A controlled pause is an explicit *new run*, not a way to resume or
+    # tamper with an already-completed result. It must align to a save/eval step.
+    from .hf_resume_contract import validate_pause_step, validate_resume_source
+    if pause_after_step is not None:
+        validate_pause_step(plan, pause_after_step, resume_checkpoint)
+    cfg = load_config(config_path, mode='hf')
+    out = Path(output).resolve()
+    if out.is_symlink():
+        raise LoraContractError('Output cannot be a symlink')
+    if resume_checkpoint is None and out.exists() and any(out.iterdir()):
+        raise LoraContractError('Output is nonempty: select a fresh directory or an explicit verified resume')
+    checkpoint = None
+    if resume_checkpoint is not None:
+        if not out.is_dir():
+            raise LoraContractError('Resume output does not exist')
+        checkpoint = Path(resume_checkpoint).resolve()
+        if not checkpoint.is_relative_to((out / 'checkpoints').resolve()):
+            raise LoraContractError('Resume checkpoint must belong to this run output')
+        verify_manifest(checkpoint, plan, kind='trainer_checkpoint')
+        prior = out / 'plan.json'
+        if not prior.is_file() or json.loads(prior.read_text('utf8')) != plan:
+            raise LoraContractError('Resume plan mismatch; refusing to overwrite another run')
+        resume_prior_step = validate_resume_source(out, checkpoint, plan)
+    # Imports deferred so preflight and all CPU Phase 1-5A tests stay lightweight.
+    import torch
+    from datasets import load_dataset
+    from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
+    from transformers import (AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig,
+                              Trainer, TrainingArguments, TrainerCallback)
+
+    out.mkdir(parents=True, exist_ok=True)
+    lock = _lock(out)
+    try:
+        if not (out / 'plan.json').exists():
+            _write_json_atomic(out / 'plan.json', plan)
+        _write_json_atomic(out / 'run_state.json', {'status': 'running', 'schema': 'lora-pilot-v0.7',
+                                                    'resume_checkpoint': str(checkpoint) if checkpoint else None})
+        tokenizer = AutoTokenizer.from_pretrained(plan['model'], revision=plan['revision'], trust_remote_code=False)
+        if tokenizer.pad_token_id is None:
+            tokenizer.pad_token = tokenizer.eos_token
+        if tokenizer.pad_token_id is None:
+            raise LoraContractError('Tokenizer lacks both padding and EOS tokens')
+        dataset = load_dataset('json', data_files=plan['data_files'])
+        if 'text' not in dataset['train'].column_names or 'text' not in dataset['validation'].column_names:
+            raise LoraContractError('Each split must have a text field')
+        tokenized = dataset.map(
+            lambda batch: tokenizer(batch['text'], max_length=cfg['model']['max_length'], truncation=True),
+            batched=True, remove_columns=dataset['train'].column_names)
+        if plan['quantization'] == '4bit':
+            dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            kwargs = {'quantization_config': BitsAndBytesConfig(load_in_4bit=True,
+                bnb_4bit_quant_type='nf4', bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=dtype)}
+        else:
+            dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else (torch.float16 if torch.cuda.is_available() else torch.float32)
+            kwargs = {}
+        model = AutoModelForCausalLM.from_pretrained(
+            plan['model'], revision=plan['revision'], dtype=dtype,
+            trust_remote_code=False, **kwargs)
+        model.config.use_cache = False
+        if plan['quantization'] == '4bit':
+            model = prepare_model_for_kbit_training(model)
+        tr = cfg['train']
+        model = get_peft_model(model, LoraConfig(task_type=TaskType.CAUSAL_LM,
+            r=int(tr['lora_r']), lora_alpha=int(tr['lora_alpha']),
+            lora_dropout=float(tr['lora_dropout']), target_modules=plan['target_modules']))
+        n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        if n_parameters == 0:
+            raise LoraContractError('No trainable adapter parameters discovered')
+        _log_jsonl(out / 'events.jsonl', {'event':'adapter_initialized', 'trainable_parameters':n_parameters})
+
+        class AutoTuneCallback(TrainerCallback):
+            def __init__(self):
+                self.last_eval_step = 0
+                self.losses = []
+                self.monitor = MonitorStream(out / 'monitor_decisions.jsonl', cfg['monitor'])
+                self.stop_reason = None
+                self.fault_injected = False
+                self.last_train_loss = None
+                self.pause_observed = False
+                self.resume_begin_step = None
+                self.resume_optimizer_has_state = False
+                self.resume_scheduler_step = None
+
+            def on_train_begin(self, args, state, control, **kwargs):
+                # Trainer fires this after it has restored checkpoint state.
+                # Inspect it BEFORE any new update to distinguish a true
+                # optimizer/scheduler resume from loading adapter weights only.
+                if checkpoint is not None:
+                    optimizer = kwargs.get('optimizer')
+                    scheduler = kwargs.get('lr_scheduler')
+                    if optimizer is None or scheduler is None:
+                        raise LoraContractError('Trainer did not expose optimizer/scheduler at resume start')
+                    optimizer_state = optimizer.state_dict()
+                    self.resume_optimizer_has_state = bool(optimizer_state.get('state'))
+                    self.resume_begin_step = int(state.global_step)
+                    self.resume_scheduler_step = int(scheduler.state_dict().get('last_epoch', -1))
+                    if self.resume_begin_step != resume_prior_step:
+                        raise LoraContractError('Trainer did not restore expected checkpoint global_step')
+                    if not self.resume_optimizer_has_state:
+                        raise LoraContractError('Trainer optimizer state was empty at resume start')
+                    if self.resume_scheduler_step < resume_prior_step:
+                        raise LoraContractError('Trainer scheduler step was not restored')
+                return control
+
+            def on_step_end(self, args, state, control, **kwargs):
+                if pause_after_step is not None and int(state.global_step) == pause_after_step:
+                    self.pause_observed = True
+                    control.should_save = True
+                    control.should_training_stop = True
+                return control
+
+            def on_log(self, args, state, control, logs=None, **kwargs):
+                if logs is not None and 'loss' in logs:
+                    loss = float(logs['loss'])
+                    self.losses.append((int(state.global_step), loss))
+                    _log_jsonl(out / 'training_logs.jsonl', {'step': int(state.global_step), 'train_loss':loss})
+                return control
+
+            def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+                if not metrics or 'eval_loss' not in metrics:
+                    return control
+                step = int(state.global_step)
+                train_window = [x for s, x in self.losses if self.last_eval_step < s <= step]
+                val = float(metrics['eval_loss'])
+                if not train_window:
+                    _log_jsonl(out / 'events.jsonl', {'event':'unpaired_evaluation', 'step':step})
+                    self.last_eval_step = step
+                    return control  # Never invent a corresponding train loss.
+                observed = {'step':step, 'train_loss':sum(train_window)/len(train_window),
+                            'val_loss':val}
+                decision = self.monitor.observe(observed)
+                _log_jsonl(out / 'metrics.jsonl', observed)
+                _log_jsonl(out / 'events.jsonl', {'event':'diagnosis', 'step':step,
+                                                  'state':decision.state, 'action':decision.action})
+                self.last_eval_step = step
+                self.losses = [(s, x) for s, x in self.losses if s > step]
+                if decision.should_stop:
+                    self.stop_reason = decision.state
+                    control.should_training_stop = True
+                    control.should_save = True
+                elif injected_diagnosis is not None and not self.fault_injected:
+                    # Explicit acceptance-test fault. Keep the true observed metrics
+                    # and diagnosis separate; NEVER claim natural overfitting.
+                    self.stop_reason = injected_diagnosis
+                    self.fault_injected = True
+                    _log_jsonl(out / 'events.jsonl', {'event':'fault_injection_stop',
+                        'diagnosis':injected_diagnosis, 'step':step, 'synthetic_trigger':True,
+                        'observed_monitor_state':decision.state})
+                    control.should_training_stop = True
+                    control.should_save = True
+                return control
+
+            def on_save(self, args, state, control, **kwargs):
+                checkpoint_dir = Path(args.output_dir) / f'checkpoint-{state.global_step}'
+                write_manifest(checkpoint_dir, plan, kind='trainer_checkpoint')
+                return control
+
+        callback = AutoTuneCallback()
+        args = TrainingArguments(
+            output_dir=str(out / 'checkpoints'),
+            learning_rate=float(tr['learning_rate']),
+            max_steps=int(plan['estimated_steps']),
+            per_device_train_batch_size=int(tr['per_device_train_batch_size']),
+            per_device_eval_batch_size=int(tr['per_device_train_batch_size']),
+            gradient_accumulation_steps=int(tr['gradient_accumulation_steps']),
+            weight_decay=float(tr['weight_decay']),
+            eval_strategy='steps', save_strategy='steps',
+            eval_steps=int(tr['eval_steps']), save_steps=int(tr['eval_steps']),
+            logging_strategy='steps', logging_steps=int(tr['eval_steps']),
+            load_best_model_at_end=True, metric_for_best_model='eval_loss',
+            greater_is_better=False, save_total_limit=3, report_to='none',
+            bf16=torch.cuda.is_available() and torch.cuda.is_bf16_supported(),
+            fp16=torch.cuda.is_available() and not torch.cuda.is_bf16_supported(),
+            seed=plan['seed'], save_only_model=False,
+            use_cpu=(plan['device'] == 'cpu'))
+        trainer = Trainer(model=model, args=args, train_dataset=tokenized['train'],
+            eval_dataset=tokenized['validation'], data_collator=_build_collator(tokenizer),
+            processing_class=tokenizer, callbacks=[callback])
+        trainer.train(resume_from_checkpoint=str(checkpoint) if checkpoint else None)
+        if pause_after_step is not None:
+            if not callback.pause_observed or int(trainer.state.global_step) != pause_after_step:
+                raise LoraContractError('Controlled pause did not occur at the requested step')
+            paused_ckpt = (out / 'checkpoints' / f'checkpoint-{pause_after_step}').resolve()
+            verify_manifest(paused_ckpt, plan, kind='trainer_checkpoint')
+            paused = {'ok': True, 'status': 'paused', 'checkpoint': str(paused_ckpt),
+                      'global_step': pause_after_step, 'target_step': plan['estimated_steps'],
+                      'note': 'Controlled test pause. Restart with explicit --resume-checkpoint; do not alter config.'}
+            _write_json_atomic(out / 'pause_receipt.json', paused)
+            _write_json_atomic(out / 'run_state.json', {'status': 'paused', 'schema': 'lora-pilot-v0.8.2',
+                                                        'checkpoint': str(paused_ckpt), 'step': pause_after_step})
+            return paused
+        if checkpoint is not None:
+            if callback.resume_begin_step != resume_prior_step or not callback.resume_optimizer_has_state:
+                raise LoraContractError('Trainer resumed without validated optimizer state')
+            if int(trainer.state.global_step) <= resume_prior_step:
+                raise LoraContractError('No optimizer steps executed after resume')
+        best = trainer.state.best_model_checkpoint
+        if best is None:
+            raise LoraContractError('No best checkpoint selected. Check eval frequency and data size.')
+        verify_manifest(best, plan, kind='trainer_checkpoint')
+        final = out / 'final_adapter'
+        if final.exists():
+            raise LoraContractError('Final adapter directory exists: refusing silent overwrite')
+        final.mkdir()
+        trainer.save_model(str(final))
+        tokenizer.save_pretrained(str(final))
+        manifest = write_manifest(final, plan, kind='final_adapter')
+        verify_manifest(final, plan, kind='final_adapter')
+        score = trainer.state.best_metric
+        if isinstance(score, bool) or not isinstance(score, (float, int)) or not math.isfinite(float(score)):
+            raise LoraContractError('Trainer best_metric missing or non-finite')
+        result = {'ok': True, 'mode': 'HF PEFT LoRA' if plan['quantization'] == 'none' else 'HF QLoRA 4-bit',
+                  'model': plan['model'], 'trainable_parameters':n_parameters,
+                  'best_val_loss':float(score), 'best_checkpoint':str(best),
+                  'adapter_dir':str(final), 'adapter_manifest_sha256':manifest['files'].get('adapter_model.safetensors'),
+                  'stop_diagnosis':callback.stop_reason, 'fault_injected':callback.fault_injected, 'note':'GPU training only if the run actually executed on a supported GPU.'}
+        if checkpoint is not None:
+            resume_proof = {'ok': True, 'mode': 'HF TRAINER RESUME VERIFICATION',
+                            'checkpoint': str(checkpoint), 'checkpoint_step': resume_prior_step,
+                            'trainer_begin_step': callback.resume_begin_step,
+                            'trainer_end_step': int(trainer.state.global_step),
+                            'optimizer_state_nonempty_at_resume': callback.resume_optimizer_has_state,
+                            'scheduler_last_epoch_at_resume': callback.resume_scheduler_step,
+                            'note': 'Trainer resume called with full, hash-verified checkpoint. CPU smoke proof; not bitwise equivalence testing.'}
+            _write_json_atomic(out / 'resume_proof.json', resume_proof)
+            result['resume_proof'] = str(out / 'resume_proof.json')
+        _write_json_atomic(out / 'result_receipt.json', result)
+        _write_json_atomic(out / 'run_state.json', {'status':'completed', 'schema':'lora-pilot-v0.7',
+                                                     'best_checkpoint':str(best)})
+        return result
+    except BaseException as exc:
+        _write_json_atomic(out / 'run_state.json', {'status':'blocked', 'schema':'lora-pilot-v0.7',
+                                                   'error_type':type(exc).__name__})
+        raise
+    finally:
+        lock.unlink(missing_ok=True)
+
+
+def reload_adapter(config_path: str, artifact_dir: str, *, allow_cpu: bool=False) -> dict:
+    """Explicitly reload trained adapter from fresh base. Can consume large GPU VRAM."""
+    plan = make_plan(config_path)
+    _gpu_mode(plan, explicit_cpu=allow_cpu)
+    verify_manifest(artifact_dir, plan, kind='final_adapter')
+    import torch
+    from peft import PeftModel
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+    dtype = torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else (torch.float16 if torch.cuda.is_available() else torch.float32)
+    quant_kwargs = {}
+    if plan['quantization'] == '4bit':
+        quant_kwargs['quantization_config'] = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type='nf4',
+            bnb_4bit_use_double_quant=True, bnb_4bit_compute_dtype=dtype)
+    base = AutoModelForCausalLM.from_pretrained(plan['model'], revision=plan['revision'],
+                                                dtype=dtype, trust_remote_code=False, **quant_kwargs)
+    model = PeftModel.from_pretrained(base, artifact_dir, is_trainable=False)
+    tokenizer = AutoTokenizer.from_pretrained(artifact_dir, trust_remote_code=False)
+    model.eval()
+    with torch.inference_mode():
+        encoded = tokenizer('Explain machine learning briefly.', return_tensors='pt')
+        if plan['device'] == 'gpu':
+            if plan['quantization'] != '4bit':
+                model = model.to('cuda')
+            encoded = {k:v.to('cuda') for k,v in encoded.items()}
+        output = model.generate(**encoded, max_new_tokens=8, do_sample=False,
+                                pad_token_id=tokenizer.eos_token_id)
+    return {'ok':True,'generated_token_count':int(output.shape[-1] - encoded['input_ids'].shape[-1]),
+            'adapter_verified':True, 'note':'Inference smoke only, not a quality benchmark.'}

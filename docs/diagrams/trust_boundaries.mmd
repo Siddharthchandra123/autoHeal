@@ -1,0 +1,10 @@
+flowchart LR
+  OUTSIDE[Untrusted Meta advisory output] --> PARSE[Strict parse and numeric allowlist]
+  PARSE --> LIMIT[Per-key bounds + directional checks]
+  LIMIT --> REVIEW{Policy / budget / compatibility}
+  REVIEW -->|Approved| PATCH[Versioned YAML only]
+  REVIEW -->|Rejected| AUDIT[Audit and deterministic fallback]
+  PATCH --> TEST[Revalidation and tests]
+  TEST -->|Pass| LAUNCH[Schedule controlled attempt]
+  TEST -->|Fail| AUDIT
+  LAUNCH --> EVAL[Held-out eval + human/automatic gate]

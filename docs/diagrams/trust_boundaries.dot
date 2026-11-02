@@ -1,0 +1,17 @@
+digraph Trust {
+  graph [bgcolor="transparent", rankdir=TB, nodesep=.32, ranksep=.38, pad=.12];
+  node [fontname="DejaVu Sans", fontsize=10, shape=box, style="rounded,filled", color="#94A3B8", fillcolor="#F0F5FD", margin="0.14,0.09"];
+  edge [color="#64748B", penwidth=1.3, arrowsize=.65, fontsize=8];
+  input [label="Untrusted Meta model response", fillcolor="#FEE2E2"];
+  parse [label="Strict JSON parsing\nAllowed numeric keys only"];
+  bounds [label="Finite numbers; per-key limits\nDirection + step-size constraints"];
+  dec [label="Budget, compatibility and policy", shape=diamond, fillcolor="#FEF3C7"];
+  patch [label="Versioned YAML patch only", fillcolor="#DCFCE7"];
+  test [label="Revalidate config + automated tests"];
+  run [label="Launch bounded trial", fillcolor="#DCFCE7"];
+  reject [label="Audit rejection / deterministic fallback", fillcolor="#FEE2E2"];
+  input -> parse -> bounds -> dec;
+  dec -> patch [label="approved"]; patch -> test -> run;
+  dec -> reject [label="rejected"];
+  test -> reject [label="failed"];
+}

@@ -1,0 +1,30 @@
+digraph Recovery {
+  graph [bgcolor="transparent",rankdir=TB,ranksep=.33,nodesep=.33,pad=.18];
+  node [shape=box,style="rounded,filled",fontname="DejaVu Sans",fontsize=10,margin=".14,.10",fillcolor="#F1F5F9",color="#CBD5E1"];
+  edge [color="#64748B",arrowsize=.6,penwidth=1.2,fontname="DejaVu Sans",fontsize=9];
+  cfg [label="Validate config + hash",fillcolor="#DBEAFE",color="#93C5FD"];
+  init [label="Create / resume experiment\natomic state journal + lock",fillcolor="#DBEAFE",color="#93C5FD"];
+  decision [label="Existing attempt?",shape=diamond,fillcolor="#FEF3C7",color="#FCD34D"];
+  new [label="Persist new RUNNING attempt\ntrial number + idempotency key",fillcolor="#D1FAE5",color="#86EFAC"];
+  train [label="Synthetic trainer\nmetrics + monitor + best marker",fillcolor="#D1FAE5",color="#86EFAC"];
+  receipt [label="Atomic result receipt\ncheckpoint SHA256 + metrics",fillcolor="#F1F5F9"];
+  verify [label="Verify receipt / checkpoint\ncommit once to state journal",fillcolor="#DBEAFE",color="#93C5FD"];
+  health [label="Training state?",shape=diamond,fillcolor="#FEF3C7",color="#FCD34D"];
+  retry [label="Policy + max-trials guard",shape=diamond,fillcolor="#FEF3C7",color="#FCD34D"];
+  hold [label="BLOCK: no silent retry\noperator intervention",fillcolor="#FEE2E2",color="#FDA4AF"];
+  best [label="Verify selected best receipt\nwrite active.yaml",fillcolor="#D1FAE5",color="#86EFAC"];
+  done [label="Terminal: completed\nor budget exhausted",fillcolor="#D1FAE5",color="#86EFAC"];
+  cfg -> init -> decision;
+  decision -> new [label="no attempt / stopped"];
+  decision -> verify [label="RUNNING + receipt"];
+  decision -> hold [label="RUNNING no receipt"];
+  decision -> best [label="completed"];
+  new -> train -> receipt -> verify -> health;
+  health -> retry [label="over/underfit"];
+  health -> best [label="completed"];
+  health -> hold [label="divergence / unknown"];
+  retry -> new [label="approved + budget"];
+  retry -> best [label="budget exhausted"];
+  retry -> hold [label="patch rejected"];
+  best -> done;
+}

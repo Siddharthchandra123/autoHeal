@@ -1,0 +1,22 @@
+flowchart LR
+    S["Verified stopped trial\n+ checkpoint receipt"] --> M["Numeric-only metrics\n+ allowlisted train params"]
+    M --> P{"Provider"}
+    P -->|Offline| MOCK["Deterministic mock advisor"]
+    P -->|Opt-in live| META["Meta Muse Spark API"]
+    MOCK --> JSON["Strict JSON response parser"]
+    META --> JSON
+    JSON --> POLICY{"Policy approval"}
+    POLICY -->|valid| DEC["Versioned advice record\n+ SHA-256 identity"]
+    POLICY -->|invalid or timeout| FALL["Deterministic fallback"]
+    FALL --> DEC
+    DEC --> REPLAY["Replay same decision on resume"]
+    REPLAY --> KFP["New bounded training attempt"]
+    POLICY -->|No safe patch| HALT["Block for operator review"]
+    classDef safe fill:#e5f4ec,stroke:#178654,color:#155235
+    classDef decision fill:#fff5dc,stroke:#c27c10,color:#5d3b0a
+    classDef model fill:#e9ecff,stroke:#5143b6,color:#221f5c
+    classDef halt fill:#ffe5e5,stroke:#b33838,color:#802020
+    class S,M,DEC,REPLAY,KFP safe
+    class P,JSON,POLICY decision
+    class MOCK,META,FALL model
+    class HALT halt

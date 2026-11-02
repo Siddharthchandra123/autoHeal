@@ -1,0 +1,26 @@
+digraph RealRecovery {
+  graph [rankdir=TB, bgcolor="transparent", nodesep="0.38", ranksep="0.56", pad="0.15"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, color="#184a73", fillcolor="#eaf3ff", margin="0.17,0.12"];
+  edge [color="#5c7088", arrowsize=0.7];
+  data [label="JSONL data + SHA-256 identity"];
+  train [label="Real PyTorch CPU training
+(Embedding + GRU + projection)", fillcolor="#def7e8", color="#197d53"];
+  monitor [label="Training and validation metrics
+Phase 2 diagnosis", fillcolor="#fff1dc", color="#bd781f"];
+  weights [label="Best checkpoint .pt
+model + optimizer state", fillcolor="#def7e8", color="#197d53"];
+  receipt [label="Checkpoint SHA-256 receipt
+config and dataset binding"];
+  verify [label="weights_only load + shape check
+verified receipt"];
+  state [label="Decision: complete / stop / error", shape=diamond, style="filled", fillcolor="#f3ebff", color="#7744aa"];
+  policy [label="Meta mock or safe fallback
+policy-approved parameter patch", fillcolor="#f3ebff", color="#7744aa"];
+  retry [label="Durable bounded new attempt", fillcolor="#f3ebff", color="#7744aa"];
+  select [label="Verified best model + active.yaml", fillcolor="#def7e8", color="#197d53"];
+  block [label="BLOCK - operator review", fillcolor="#ffe5e5", color="#b13b3b"];
+  data -> train; train -> monitor; train -> weights; weights -> receipt -> verify;
+  monitor -> state; state -> select [label="complete"]; state -> policy [label="overfit / underfit"];
+  policy -> retry -> train; state -> block [label="diverge / failure"];
+  verify -> select;
+}

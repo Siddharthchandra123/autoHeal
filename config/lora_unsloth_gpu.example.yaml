@@ -1,0 +1,47 @@
+# GPU-ONLY optional backend. Do not execute on CPU.
+# Inspect model license and supported hardware before downloading.
+project: AutoTune-AI-Unsloth-GPU-Experimental
+model:
+  name: unsloth/Qwen3-0.6B
+  max_length: 256
+data:
+  train_file: sample_data/train.jsonl
+  validation_file: sample_data/validation.jsonl
+train:
+  learning_rate: 0.0002
+  num_train_epochs: 2
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  eval_steps: 2
+  weight_decay: 0.01
+  lora_r: 8
+  lora_alpha: 16
+  lora_dropout: 0.05
+monitor:
+  min_evaluations: 3
+  patience: 2
+  min_delta: 0.01
+  generalization_gap: 0.2
+  underfit_loss_floor: 6.0
+  flat_window: 3
+  flat_threshold: 0.001
+  loss_spike_ratio: 2.0
+  loss_spike_patience: 2
+  grad_norm_warning: 1000.0
+safety:
+  max_trials: 1
+meta_agent:
+  enabled: false
+  provider: mock
+  model: muse-spark-1.3
+simulator:
+  scenario: healthy
+hf:
+  device: gpu
+  quantization: none
+  target_modules:
+  - q_proj
+  - v_proj
+  revision: main
+  max_steps: 4
+  seed: 42

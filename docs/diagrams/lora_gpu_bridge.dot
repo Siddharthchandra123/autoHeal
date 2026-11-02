@@ -1,0 +1,28 @@
+digraph LoraBridge {
+  graph [rankdir=TB, bgcolor="white", pad="0.24", nodesep="0.28", ranksep="0.43", splines=ortho, fontname="DejaVu Sans", fontsize=12];
+  node [shape=box, style="rounded,filled", fillcolor="#EAF2FF", color="#3066B1", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, margin="0.12,0.08"];
+  edge [color="#58687D", arrowsize=0.65, fontname="DejaVu Sans", fontsize=9];
+  user [label="Windows VS Code\nEngineer"];
+  pre [label="OFFLINE PREFLIGHT\nConfig + dataset / SHA256", fillcolor="#DBEAFE"];
+  gate [shape=diamond, label="GPU + license\nready?", fillcolor="#FEF3C7", color="#D97706"];
+  stop [label="STOP / ENV FIX", fillcolor="#FEE2E2", color="#B91C1C"];
+  hub [label="MODEL HUB\nMeta Llama approved access", fillcolor="#DBEAFE"];
+  train [label="GPU PyTorch + PEFT\nLoRA / optional QLoRA", fillcolor="#DCFCE7", color="#15946B"];
+  monitor [label="Evaluation windows\nMonitorStream stop rules", fillcolor="#EDF0FB"];
+  save [label="Best Trainer checkpoint\nAdapter + optimizer + RNG", fillcolor="#DCFCE7", color="#15946B"];
+  manifest [label="SHA256 artifact manifest\nProvenance / integrity check", fillcolor="#FFF5DA", color="#D97706"];
+  verify [shape=diamond, label="Valid?", fillcolor="#FEF3C7", color="#D97706"];
+  blocked [label="BLOCK + INVESTIGATE", fillcolor="#FEE2E2", color="#B91C1C"];
+  artifact [label="Verified final adapter\nOptional reload smoke", fillcolor="#DFF8EC", color="#15946B"];
+  future [label="FUTURE: MLflow / Kubeflow\nPolicy-approved recovery", fillcolor="#F1EAFE", color="#7C3AED"];
+  user -> pre -> gate;
+  gate -> stop [label="no"];
+  gate -> hub [label="yes"];
+  hub -> train -> monitor;
+  monitor -> train [label="continue"];
+  monitor -> save [label="end / stop"];
+  save -> manifest -> verify;
+  verify -> blocked [label="no"];
+  verify -> artifact [label="yes"];
+  artifact -> future [style=dashed, label="not wired yet"];
+}

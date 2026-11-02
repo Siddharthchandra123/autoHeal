@@ -1,0 +1,17 @@
+flowchart TB
+  A[Versioned JSONL training and validation] --> B[Dataset fingerprint and validation]
+  B --> C[Real PyTorch byte LM trainer]
+  C --> D[Per-epoch training and validation loss]
+  D --> E[Metric monitor and early-stop policy]
+  C --> F[Best .pt weights and optimizer state]
+  F --> G[SHA256 checkpoint receipt]
+  G --> H[Safe torch.load weights_only]
+  E --> I{Completed or stopped?}
+  I -->|Completed| J[Best checkpoint verification]
+  I -->|Overfit or underfit| K[Meta advisor or fallback]
+  K --> L[Deterministic parameter validation]
+  L --> M[Durable bounded retry]
+  M --> C
+  H --> J
+  J --> N[active.yaml for promotion review]
+  I -->|Diverged or error| O[Block and review]

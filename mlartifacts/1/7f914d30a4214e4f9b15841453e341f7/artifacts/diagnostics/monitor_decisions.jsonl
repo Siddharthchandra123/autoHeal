@@ -1,0 +1,1 @@
+{"timestamp_utc": "2026-11-02T08:23:49.213093+00:00", "type": "monitor_decision", "step": 2, "decision": {"state": "none", "explanation": "Collecting warm-up evaluations", "severity": "info", "action": "continue", "evidence": {"evaluations": 1, "min_evaluations": 3}}}

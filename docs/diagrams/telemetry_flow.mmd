@@ -1,0 +1,12 @@
+flowchart LR
+  A["Trainer evaluation callback"] --> B["Typed MetricEvent: step, train loss, validation loss, optional signals"]
+  B --> C["Windowed diagnostic engine"]
+  C --> D["Decision: state, severity, action, evidence"]
+  D --> E{"Stop required?"}
+  E -->|Yes| F["Stop current attempt and retain best candidate"]
+  E -->|No| G["Continue training and collect more evidence"]
+  B --> H[("metrics.jsonl")]
+  D --> I[("monitor_decisions.jsonl")]
+  H --> J["Offline replay CLI"]
+  J --> C
+  F --> K["Phase 3 durable recovery controller - planned"]

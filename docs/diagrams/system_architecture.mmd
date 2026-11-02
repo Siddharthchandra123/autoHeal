@@ -1,0 +1,19 @@
+flowchart TB
+  INPUT[Training request + versioned dataset + baseline YAML] --> VALID[Config validator + SHA256]
+  VALID --> KFP[Kubeflow Pipelines v2 - future orchestration]
+  KFP --> OPT{HPO backend}
+  OPT -->|Primary| KAT[Kubeflow Katib]
+  OPT -->|Optional alternative| RAY[Ray Tune]
+  KAT --> TRAIN[PyTorch / Hugging Face Meta Llama LoRA training]
+  RAY --> TRAIN
+  TRAIN --> OBS[Evaluation callbacks + MLflow tracking]
+  OBS --> DET[Deterministic metrics diagnosis]
+  DET -->|Problem| AGENT[Meta Muse reasoning agent - advisory only]
+  AGENT --> POLICY[Policy engine validates bounded YAML patch]
+  DET -->|Problem| POLICY
+  POLICY -->|Approved| VERSION[Version configuration + preserve best checkpoint]
+  VERSION -->|Next bounded attempt| KFP
+  DET -->|Healthy/final| EVAL[Held-out evaluation + registry gate]
+  TRAIN --> ART[(Checkpoint / artifact storage)]
+  ART --> VERSION
+  EVAL --> RELEASE[Approval then model promotion]

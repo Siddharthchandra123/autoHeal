@@ -1,0 +1,34 @@
+{
+  "attempt_count": 2,
+  "attempts": [
+    {
+      "attempt": 1,
+      "best_checkpoint": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-01\\checkpoints\\checkpoint-2",
+      "best_val_loss": 10.365178108215332,
+      "config_sha256": "900eb8b026bd396a473bd7997205917aaba9bee377ad6dc75d9a0f614ef5c965",
+      "fault_injected": true,
+      "final_adapter": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-01\\final_adapter",
+      "stop_diagnosis": "overfit"
+    },
+    {
+      "attempt": 2,
+      "best_checkpoint": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-02\\checkpoints\\checkpoint-2",
+      "best_val_loss": 10.365181922912598,
+      "config_sha256": "069cce048fb7f1dcb611248232a6a6a9758b8103763d1d5d049be5a8161d9ea8",
+      "fault_injected": false,
+      "final_adapter": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-02\\final_adapter",
+      "stop_diagnosis": null
+    }
+  ],
+  "best_checkpoint": "C:\\Users\\Lenovo\\Downloads\\autoHeal_finetune\\outputs\\hf-selfheal-mlflow-01\\trial-01\\checkpoints\\checkpoint-2",
+  "best_trial": 1,
+  "best_val_loss": 10.365178108215332,
+  "fault_injection_used": true,
+  "mode": "REAL HF PEFT LoRA CPU; bounded controller",
+  "note": "Validation comparison on toy data, not a model-quality or deployment gate.",
+  "ok": true,
+  "promotion_approved": false,
+  "schema": "autotune-hf-selfheal-v0.8.6",
+  "status": "completed",
+  "training_outcome": "finished"
+}

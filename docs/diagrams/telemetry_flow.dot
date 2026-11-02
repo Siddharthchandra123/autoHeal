@@ -1,0 +1,18 @@
+digraph Telemetry {
+  graph [bgcolor="transparent",rankdir=LR,nodesep=.30,ranksep=.43,pad=.16];
+  node [fontname="DejaVu Sans",fontsize=10,shape=box,style="rounded,filled",color="#CBD5E1",fillcolor="#F1F5F9",margin="0.16,0.1"];
+  edge [color="#64748B",penwidth=1.25,arrowsize=.62];
+  producer [label="Trainer callback\n(mock or HF)",fillcolor="#DCFCE7",color="#86EFAC"];
+  event [label="MetricEvent\nstep + train/val loss\noptional grad/LR/GPU",fillcolor="#DBEAFE",color="#93C5FD"];
+  audit [label="metrics.jsonl\nstrict JSON + fault flags"];
+  detector [label="Windowed detector\nfinite | patience | gap\nspikes | plateau",fillcolor="#FEF3C7",color="#FCD34D"];
+  result [label="Decision\nstate + severity\naction + evidence",fillcolor="#EDE9FE",color="#C4B5FD"];
+  log [label="monitor_decisions.jsonl\naudit log",fillcolor="#F1F5F9"];
+  controller [label="Local controller\nstop only on action=stop",fillcolor="#FEE2E2",color="#FDA4AF"];
+  cli [label="Offline replay CLI\nno training required",fillcolor="#F1F5F9"];
+  producer -> event -> detector -> result -> controller;
+  event -> audit;
+  result -> log;
+  audit -> cli;
+  cli -> detector [style=dashed];
+}

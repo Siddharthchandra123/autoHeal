@@ -1,0 +1,16 @@
+flowchart TD
+    A[Original completed LoRA run] --> B[Read-only verified artifacts]
+    B --> C[Create separate CPU resume probe]
+    C --> D[Fresh Trainer run with 4-step plan]
+    D --> E[Intentional pause at step 2]
+    E --> F[Save adapter optimizer scheduler RNG]
+    F --> G{Manifest and run state valid?}
+    G -->|No| X[Block and investigate]
+    G -->|Yes| H[Fresh Trainer invocation]
+    H --> I[Resume checkpoint-2]
+    I --> J[Inspect optimizer state and LR scheduler at train begin]
+    J --> K{State and step restored?}
+    K -->|No| X
+    K -->|Yes| L[Continue to step 4]
+    L --> M[Write resume_proof.json and final adapter]
+    M --> N[Next: agentic real-model recovery]

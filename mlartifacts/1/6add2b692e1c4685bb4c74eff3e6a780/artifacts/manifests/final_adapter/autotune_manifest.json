@@ -1,0 +1,17 @@
+{
+  "config_sha256": "900eb8b026bd396a473bd7997205917aaba9bee377ad6dc75d9a0f614ef5c965",
+  "files": {
+    "README.md": "f287f3d84b749ed457504507c80837491ea23151bcb6e256d1241d35871fcfb7",
+    "adapter_config.json": "1f8e60085627ad52487a028f42c893b191bc5be493165b467fa8e930edc2407c",
+    "adapter_model.safetensors": "38224ec308d1d647274cba857a9931ca37ade348d3c66f36b260cd71ade83372",
+    "tokenizer.json": "311f7262f89ffe8757683fda3c081a5cac5a885dc311264791a17d2a18499a4f",
+    "tokenizer_config.json": "acc8ac174bec0dfdd4b0c6315bf4c63118f687728acf2a02af068731bb601f7d",
+    "training_args.bin": "3d39edd42ec528acd303eb8605ab334ba5664d8b2c4891e6ad2904830b08ef03"
+  },
+  "kind": "final_adapter",
+  "model": "sshleifer/tiny-gpt2",
+  "revision": "main",
+  "schema": "autotune-lora-artifact-v0.7",
+  "train_sha256": "89205ea7538459f57758ab533240d2b58f67fb6dcd9895354039574e6d0e0fa2",
+  "validation_sha256": "eb7ecfafcb119910c092b6d38acff87ae56b0b08480808980eb44b46df5fb47d"
+}

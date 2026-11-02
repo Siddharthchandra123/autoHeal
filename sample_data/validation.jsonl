@@ -1,0 +1,2 @@
+{"text":"Instruction: What is validation loss? Response: Validation loss estimates how well a model generalizes to held-out examples."}
+{"text":"Instruction: Explain early stopping. Response: Early stopping halts training when monitored validation performance stops improving."}
