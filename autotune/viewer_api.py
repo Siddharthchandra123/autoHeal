@@ -135,16 +135,19 @@ class ViewerStore:
         return {'run_id': run_id, 'metric': metric, 'points': points}
 
 
-def create_app(*, client: Any = None, tracking_uri: str | None = None) -> FastAPI:
+def create_app(*, client: Any = None, tracking_uri: str | None = None,
+               enable_docs: bool | None = None) -> FastAPI:
     uri = tracking_uri or os.environ.get('AUTOTUNE_MLFLOW_URI', 'http://127.0.0.1:5000')
     store = ViewerStore(uri, client=client)
+    # API reference is opt-in for local development; keep it disabled by default.
+    if enable_docs is None:
+        enable_docs = os.environ.get('AUTOTUNE_ENABLE_DOCS', '').strip() == '1'
     app = FastAPI(
-    title="AutoTune AI Local Viewer",
-    version="0.9.0",
-    docs_url=None,
-    redoc_url=None,
-    openapi_url=None
-)
+        title='AutoTune AI Local Viewer', version='0.9.1',
+        docs_url='/docs' if enable_docs else None,
+        redoc_url=None,
+        openapi_url='/openapi.json' if enable_docs else None,
+    )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=['127.0.0.1', 'localhost', 'testserver'])
     app.add_middleware(CORSMiddleware, allow_origins=[
         'http://127.0.0.1:3000', 'http://localhost:3000'],

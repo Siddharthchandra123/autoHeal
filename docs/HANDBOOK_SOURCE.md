@@ -3,10 +3,24 @@
   <h1>AutoTune AI</h1>
   <p class="cover-sub">An Agentic, Self-Healing MLOps Platform</p>
   <p class="cover-text">Architecture, training diagnostics, guarded hyperparameter recovery, Kubeflow orchestration, Meta advisor integration, implementation roadmap and verified baseline.</p>
-  <p class="cover-meta">Version: v0.8.2 &nbsp;&nbsp; | &nbsp;&nbsp; Checkpoint: Real Tiny GPT-2 CPU LoRA success + artifact audit gate &nbsp;&nbsp; | &nbsp;&nbsp; 01 November 2026</p>
-  <p class="cover-note">This handbook distinguishes CPU synthetic recovery from genuine small-model PyTorch training. Real tiny GPT-2 CPU LoRA training was user-verified. No hosted Meta API, Meta Llama GPU fine-tuning, optimizer resume, or production deployment is claimed.</p>
+  <p class="cover-meta">Version: v0.14.0 &nbsp;&nbsp; | &nbsp;&nbsp; Checkpoint: Phase 8 Katib HPO source implementation &nbsp;&nbsp; | &nbsp;&nbsp; 09 November 2026</p>
+  <p class="cover-note">This handbook distinguishes offline tests, user-reported checkpoints, and unverified live model execution. v0.14.0 adds Katib experiment contracts, bounded search-space generation, an isolated trial worker and fail-closed result summaries, with 366 offline Python tests passing. Kubernetes/Katib cluster execution, a real HF trial, full Next.js build and production deployment are not claimed.</p>
 </div>
 <div class="page-break"></div>
+
+# v0.13.0 - Phase 7 Knowledge Engine Scale & Reliability (historical checkpoint)
+
+**Build checkpoint - 09 November 2026.** Phase 7 connects local document ingestion, SQLite/FTS5 keyword retrieval, optional CPU sentence-transformer embeddings, hybrid RAG, source-quote-validated instruction generation, source-document-disjoint train/validation/test sets, structured message datasets, response-only LoRA loss masking, sequential multi-model trial orchestration, held-out base-versus-adapter token-F1 comparison, verified adapter export, background training jobs and a Next.js Knowledge Engine dashboard page. v0.13.0 adds 512 MiB disk-staged upload, 100M-character extracted-text cap, incremental format extraction, bounded streaming chunks, batched SQLite/FTS commits, status/retry endpoints, source offsets, and memory-bounded semantic indexing/exact top-k search.
+
+**Verification:** 346 automated Python tests passed in 8.75 seconds (`PYTHONPATH=. pytest -q`) in the build environment. The core integrations are implemented and offline-tested. Live Windows acceptance, Ollama generation, optional embedding-model download/indexing, Hugging Face Hub download, real candidate fine-tuning/evaluation, Ollama merge/import/GGUF, and Next.js build/browser acceptance remain unverified. The npm installation attempt timed out in the build environment.
+
+**Architecture boundary:** RAG is for retrieving current document facts; fine-tuning is for learned task/response behaviour. The engine does not claim to teach a model all facts in a document library. Training runs require an explicit execute action; CPU training is sequential and resource intensive. Candidate selection uses a lexical token-F1 screening metric and always leaves production approval false. No candidate is forced to win.
+
+Run from Windows PowerShell with `run_phase7.ps1`; see `docs/PHASE7_KNOWLEDGE_ENGINE_v0.13.0.md` for detailed setup, routes, data gates, commands, resource limits and troubleshooting. Keep the unauthenticated prototype bound to `127.0.0.1`. Scanned-PDF OCR, comprehensive PII discovery, semantic entailment verification, production authentication and multi-tenant controls are not implemented.
+
+---
+
+
 
 # v0.8.2 - Completed artifact checks and next real checkpoint-resume exercise
 
@@ -918,3 +932,91 @@ The existing real CPU trainer and MLflow reporter are unchanged. New FastAPI rea
 See editable diagram `docs/diagrams/viewer_phase6b_v090.mmd`, the Graphviz source and `docs/PHASE6B_DASHBOARD_RUNBOOK.md`.
 
 **Verified:** full local Python test suite 238 passed (new API security and response tests 22); existing CPU training behavior retained. **Not verified:** live Windows MLflow->FastAPI->Next.js and Next.js npm build (installation timed out in package building container). **Next:** acceptance in user's Windows setup then S0 vulnerability scanner engineering.
+
+
+# v0.12.0 - Phase 7 Knowledge Engine: implementation record
+
+See [`PHASE7_KNOWLEDGE_ENGINE_v0.12.0.md`](PHASE7_KNOWLEDGE_ENGINE_v0.12.0.md) for the full runbook. This appendix records the completed source pipeline and the verification boundary.
+
+![Phase 7 Knowledge Engine architecture](diagrams/phase7_knowledge_engine.svg){.diagram}
+
+## Phase 7A - Ingestion and source management
+
+FastAPI upload supports TXT, Markdown, CSV, JSON, JSONL, PDF and DOCX; v0.13.0 defaults to a 512 MiB upload cap and 100-million-character extraction cap. HTTP bodies are staged to disk in 1 MiB blocks; common formats are extracted incrementally; chunks are inserted in bounded SQLite/FTS5 batches. Original uploads are retained for retry, and document status/progress/error fields are exposed. Chunk records preserve normalized character offsets. OCR for scanned PDFs is not included.
+
+## Phase 7B - Hybrid knowledge retrieval
+
+SQLite FTS5 keyword search is available locally. Optional CPU sentence-transformer embeddings can be indexed explicitly and stored in SQLite with model and vector hash metadata. Semantic and hybrid retrieval use reciprocal-rank fusion. `auto` falls back to lexical search if optional dependencies, embedding model or vectors are absent.
+
+## Phase 7C - Grounded RAG and question answering
+
+Local Ollama answers use retrieved passages only, request structured citations and exact quote strings, and validate the chunk ID and quote substring server-side. A lexical overlap score is a weak screening heuristic, not a proof of entailment. The Ollama URL is restricted to loopback.
+
+## Phase 7D - Grounded SFT data factory
+
+The local Ollama generator creates Q/A pairs tied to source chunk evidence. Exact quote, answer lexical-support, length, duplicate-question and basic PII/secret regex filters are applied. Data exports as structured `messages` JSONL and source-document-disjoint train/validation/test sets with a provenance manifest containing counts, source IDs and SHA-256 hashes for each split. Regex checks are not comprehensive PII detection. Training contracts validate message roles and data formats. Response-only SFT uses model-specific chat templates and masks prompt/padding labels with `-100`; examples exceeding max length are rejected rather than silently truncating answer tokens.
+
+## Phase 7E - Autonomous fine-tuning and selection
+
+The candidate registry contains Qwen3-0.6B, Qwen2.5-0.5B-Instruct and SmolLM2-360M-Instruct. The controller resolves immutable Hugging Face revisions, runs bounded learning-rate trials sequentially, saves per-trial configurations/results, uses validation data for trial and candidate selection, then evaluates only the single selected candidate once on the untouched test set. It applies configurable token-F1 thresholds and records `NO_QUALIFIED_MODEL` when none passes. Token F1 is not semantic correctness, user utility or a safety certification. `promotion_approved` and `production_eligible` remain false. Adapter verification, merge, Modelfile and optional GGUF export are available through the generalized Ollama bridge.
+
+## Phase 7F - Dashboard and job API
+
+The Knowledge Engine page supports upload, keyword/hybrid/semantic search, grounded ask, embedding indexing, dataset generation and preflight/execute job control. v0.13.0 polls ingestion status, displays effective limits/progress, and exposes retry for failed documents. The API serializes fine-tuning jobs through one background worker and exposes persistent job state. The dashboard frontend source exists, but the npm install attempt timed out, so TypeScript/Next.js build and browser acceptance are not claimed.
+
+## Phase 7 verification and release boundaries
+
+Build environment result for v0.13.0: `PYTHONPATH=. pytest -q` -> **346 passed in 8.75 seconds**. Dashboard TSX syntax transpilation completed with zero diagnostics; full Next.js dependency install/build remains unverified. The suite includes split-file hash tamper detection and atomic job-state persistence regression tests. Actual Ollama generation, sentence-transformer model download, Hub revision resolution, model weights download, candidate LoRA training, held-out live inference, Ollama import/GGUF and Windows UI acceptance were not executed. The API has no authentication and must remain on loopback. The Knowledge Engine is a local research/dev prototype and needs human/domain review and production security work before external deployment.
+
+
+# v0.13.0 - Large document ingestion and retrieval reliability
+
+See [`PHASE7_KNOWLEDGE_ENGINE_v0.13.0.md`](PHASE7_KNOWLEDGE_ENGINE_v0.13.0.md) for the full runbook. This update addresses the v0.12.0 memory bottlenecks rather than changing only a numeric character limit.
+
+## Configured scale limits
+
+| Limit | Default | Configuration |
+|---|---:|---|
+| Uploaded file size | 512 MiB | `AUTOTUNE_MAX_FILE_BYTES` |
+| Extracted text per document | 100,000,000 characters | `AUTOTUNE_MAX_CHARS` |
+| Text read block | 1 MiB | internal bounded read size |
+| Chunk size / overlap | 1,200 / 160 chars | `AUTOTUNE_CHUNK_SIZE`, `AUTOTUNE_CHUNK_OVERLAP` |
+| SQLite index batch | 500 chunks | `AUTOTUNE_INGEST_BATCH_CHUNKS` |
+
+## Ingestion/retrieval changes
+
+- HTTP upload copies `UploadFile` to disk in 1 MiB blocks while calculating SHA-256 and enforcing the byte cap.
+- TXT/Markdown use incremental decoding and reads; CSV and JSONL are row/record streamed; large JSON uses `ijson`; PDFs are extracted page by page; DOCX main-document paragraphs are parsed from the XML stream.
+- Chunking uses a rolling buffer and yields chunk text plus normalized extracted-character offsets. SQLite chunks and FTS5 rows are committed in batches.
+- Documents progress through `queued`, `indexing`, `indexed` and `failed`; original files are retained and a retry endpoint replays failed/incomplete ingestion after clearing partial chunks.
+- SQLite uses WAL, busy timeout and additive schema migration for existing v0.12 stores. Statistics and configured limits are exposed to the UI.
+- Embedding generation fetches source rows incrementally. Semantic search streams stored vectors and keeps only the top-k heap; it validates stored vector hashes before scoring. It is bounded-memory exact search, not an ANN index, so latency remains O(number of embedded chunks).
+
+## Release evidence and limitations
+
+`PYTHONPATH=. pytest -q` -> **346 passed in 8.75 seconds**. Eight new scale tests verify limits, streaming chunk emission, offsets, fail-closed extraction, retry, API stats, schema migration and health reporting. The Knowledge Engine dashboard TSX transpiled with zero syntax diagnostics. A full Next.js install/build and browser run are not claimed. No real 100M-character document, live Ollama, actual embedding-model indexing or real multi-model training was executed in the build environment.
+
+The limit is a configurable ceiling, not a throughput or RAM guarantee. A 100M-character file may require substantial disk space and time, and individual PDF pages, CSV rows, or parsed records may still be materialized. The unauthenticated API must remain loopback-only.
+
+
+# v0.14.0 — Phase 8 Katib Hyperparameter Optimization (2026-11-09)
+
+## Phase 8 objective
+
+Katib is the primary cross-trial hyperparameter optimizer. Each Katib Trial creates one isolated Kubernetes Job. AutoTune's in-trial deterministic monitor may stop a trial, but the durable self-healing controller is not recursively invoked inside a Katib trial. Ray Tune must not control the same experiment concurrently.
+
+## Implementation checkpoint
+
+- `autotune/katib.py` validates DNS-safe experiment identity, allowed objective/direction, bounded trial/parallelism/failure budgets, and an explicit numeric allowlist (`learning_rate`, `lora_dropout`, `weight_decay`, `lora_r`). It renders Kubeflow Katib `Experiment` v1beta1 manifests, parses objective metrics, and ranks completed trial records.
+- `autotune/katib_cli.py` provides offline `render` and `summarize` commands. It does not connect to Kubernetes.
+- `autotune/katib_trial.py` runs exactly one trial with explicit `mock` or `hf` backend. Default is synthetic mock; HF execution requires explicit opt-in, a prepared image, authorized immutable model revision, and mounted train/validation data.
+- `config/katib_cpu.yaml` defines an 8-trial CPU-first random search with 2-way parallelism and a maximum of 2 failed trials. `Dockerfile.katib-cpu` and `requirements-katib-cpu.txt` provide an explicit CPU-only Hugging Face worker image starting point. HF mode requires a workspace PVC with `data/train.jsonl` and `data/validation.jsonl`; the generated job stores trial outputs under `/workspace/runs/katib`.
+- `docs/PHASE8_KATIB_v0.14.0.md` contains the operator runbook and cluster acceptance checklist.
+
+## Safety and release policy
+
+The worker emits a single objective metric line for Katib's StdOut collector. Trial count is capped at 50, parallel trials at 8, and failed-trial allowance at 10. Only allowlisted numeric hyperparameters can be tuned. The worker uses Kubernetes Job `backoffLimit: 0` so Katib owns failed-trial accounting; no nested retry loop is launched. Every generated summary has `promotion_approved: false` and requires human review. A Katib winner is not independent holdout evidence.
+
+## Verification evidence
+
+`PYTHONPATH=. pytest -q` -> **367 passed in 8.75 seconds** in the build environment. Offline manifest rendering succeeded and the synthetic mock worker emitted `val_loss=0.5800000000` and `eval_loss=0.5800000000`. This is only a control-plane smoke result, not model training quality. No Kubernetes cluster, Katib controller/CRDs, registry image, live HF worker, or distributed trial execution was available; these remain unverified.

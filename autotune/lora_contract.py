@@ -39,10 +39,31 @@ def _safe_file(path: Path) -> Path:
     return path.resolve()
 
 
+def _record_payload(obj: dict, path: Path, line: int) -> tuple[str, str]:
+    if isinstance(obj.get('text'), str) and obj['text'].strip():
+        return 'text', obj['text'].strip()
+    messages = obj.get('messages')
+    if isinstance(messages, list) and len(messages) >= 2:
+        normalized = []
+        for message in messages:
+            if not isinstance(message, dict) or message.get('role') not in {'system','user','assistant'}:
+                raise LoraContractError(f'{path} line {line}: messages must contain system/user/assistant roles')
+            content = message.get('content')
+            if not isinstance(content, str) or not content.strip():
+                raise LoraContractError(f'{path} line {line}: message content must be nonempty')
+            normalized.append({'role': message['role'], 'content': content.strip()})
+        if normalized[-1]['role'] != 'assistant' or not any(x['role']=='user' for x in normalized):
+            raise LoraContractError(f'{path} line {line}: final message must be assistant and a user message is required')
+        payload = json.dumps(normalized, ensure_ascii=False, sort_keys=True)
+        return 'messages', payload
+    raise LoraContractError(f'{path} line {line}: expected nonempty text or structured messages field')
+
+
 def _sample_digest(path: Path) -> tuple[str, int, set[str]]:
     _safe_file(path)
     samples = set()
     rows = 0
+    data_format = None
     with path.open('r', encoding='utf-8') as handle:
         for i, line in enumerate(handle, 1):
             if not line.strip():
@@ -51,15 +72,30 @@ def _sample_digest(path: Path) -> tuple[str, int, set[str]]:
                 obj = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise LoraContractError(f'{path} line {i}: malformed JSON') from exc
-            if not isinstance(obj, dict) or not isinstance(obj.get('text'), str) or not obj['text'].strip():
-                raise LoraContractError(f'{path} line {i}: expected nonempty text field')
+            if not isinstance(obj, dict):
+                raise LoraContractError(f'{path} line {i}: record must be a JSON object')
+            fmt, payload = _record_payload(obj, path, i)
+            if data_format is None:
+                data_format = fmt
+            elif data_format != fmt:
+                raise LoraContractError(f'{path}: mixed text/messages formats are not allowed')
             rows += 1
-            samples.add(hashlib.sha256(obj['text'].strip().encode('utf-8')).hexdigest())
+            samples.add(hashlib.sha256(payload.encode('utf-8')).hexdigest())
     if rows < 2:
         raise LoraContractError(f'{path}: requires >= 2 records')
     if len(samples) != rows:
-        raise LoraContractError(f'{path}: duplicate text detected within split')
+        raise LoraContractError(f'{path}: duplicate examples detected within split')
     return _hash(path), rows, samples
+
+
+def _sample_format(path: Path) -> str:
+    with path.open('r', encoding='utf-8') as handle:
+        for i, line in enumerate(handle, 1):
+            if line.strip():
+                obj = json.loads(line)
+                fmt, _ = _record_payload(obj, path, i)
+                return fmt
+    raise LoraContractError(f'{path}: empty dataset')
 
 
 def make_plan(config_path: str | Path) -> dict:
@@ -72,7 +108,7 @@ def make_plan(config_path: str | Path) -> dict:
     hf = cfg.get('hf', {})
     if not isinstance(hf, dict):
         raise LoraContractError('hf must be a mapping')
-    unexpected = set(hf) - {'quantization', 'target_modules', 'revision', 'device', 'max_steps', 'seed'}
+    unexpected = set(hf) - {'quantization', 'target_modules', 'revision', 'device', 'max_steps', 'seed', 'loss_mode', 'chat_template_kwargs'}
     if unexpected:
         raise LoraContractError(f'Unknown hf settings: {sorted(unexpected)}')
     quant = hf.get('quantization', 'none')
@@ -94,6 +130,12 @@ def make_plan(config_path: str | Path) -> dict:
         raise LoraContractError('hf.revision must be a nonempty repository revision')
     max_steps = _require_int(hf.get('max_steps', 200), 'hf.max_steps', 1, 100000)
     seed = _require_int(hf.get('seed', 42), 'hf.seed', 0, 2**31 - 1)
+    loss_mode = hf.get('loss_mode', 'all_tokens')
+    if loss_mode not in ('all_tokens', 'response_only'):
+        raise LoraContractError('hf.loss_mode must be all_tokens or response_only')
+    template_kwargs = hf.get('chat_template_kwargs', {})
+    if not isinstance(template_kwargs, dict) or len(template_kwargs) > 16 or any(not isinstance(k, str) or not isinstance(v, (str, int, float, bool, type(None))) for k,v in template_kwargs.items()):
+        raise LoraContractError('hf.chat_template_kwargs must be a small scalar mapping')
     train_path = _safe_file(Path(cfg['data']['train_file']))
     val_path = _safe_file(Path(cfg['data']['validation_file']))
     if train_path == val_path:
@@ -102,6 +144,12 @@ def make_plan(config_path: str | Path) -> dict:
     val_hash, n_valid, valid_samples = _sample_digest(val_path)
     if train_samples & valid_samples:
         raise LoraContractError('Train/validation text leakage: duplicate examples between splits')
+    train_format = _sample_format(train_path)
+    valid_format = _sample_format(val_path)
+    if train_format != valid_format:
+        raise LoraContractError('Train/validation data formats must match')
+    if loss_mode == 'response_only' and train_format != 'messages':
+        raise LoraContractError('response_only loss requires structured messages data')
     batch = int(cfg['train']['per_device_train_batch_size'])
     accumulation = int(cfg['train']['gradient_accumulation_steps'])
     evaluations = int(cfg['train']['eval_steps'])
@@ -114,7 +162,8 @@ def make_plan(config_path: str | Path) -> dict:
     plan = {
         'schema': 'autotune-lora-plan-v0.7', 'model': name, 'revision': revision,
         'device': device, 'quantization': quant, 'target_modules': modules,
-        'max_steps': max_steps, 'seed': seed,
+        'max_steps': max_steps, 'seed': seed, 'data_format': train_format,
+        'loss_mode': loss_mode, 'chat_template_kwargs': template_kwargs,
         'config_sha256': config_sha256(cfg),
         'train_sha256': train_hash, 'validation_sha256': val_hash,
         'train_rows': n_train, 'validation_rows': n_valid,

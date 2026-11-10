@@ -15,7 +15,7 @@ import sys
 
 from .lora_contract import LoraContractError, make_plan, verify_manifest
 
-SUPPORTED_MODEL = 'HuggingFaceTB/SmolLM2-135M-Instruct'
+SUPPORTED_MODEL = 'HuggingFaceTB/SmolLM2-135M-Instruct'  # legacy default; current plans are model-generic
 
 
 def _sha(path: Path) -> str:
@@ -50,12 +50,12 @@ def _files(root: Path) -> dict[str, str]:
 
 def make_ollama_plan(config_path: str) -> dict:
     plan = make_plan(config_path)
-    if plan['model'] != SUPPORTED_MODEL:
-        raise LoraContractError(f'This Ollama pilot accepts only {SUPPORTED_MODEL}')
+    if not isinstance(plan['model'], str) or '/' not in plan['model']:
+        raise LoraContractError('Ollama export requires an explicit Hugging Face model ID')
     if plan['device'] != 'cpu' or plan['quantization'] != 'none':
         raise LoraContractError('Ollama CPU pilot requires CPU LoRA without training quantization')
-    if not {'q_proj', 'v_proj'} <= set(plan['target_modules']):
-        raise LoraContractError('Expected SmolLM2 attention LoRA targets q_proj and v_proj')
+    if not plan['target_modules']:
+        raise LoraContractError('Ollama export requires at least one configured LoRA target module')
     return {'ok': True, 'mode': 'OFFLINE PREFLIGHT - NO MODEL DOWNLOAD',
             'model': plan['model'], 'revision': plan['revision'],
             'train_rows': plan['train_rows'], 'validation_rows': plan['validation_rows'],
@@ -66,8 +66,8 @@ def make_ollama_plan(config_path: str) -> dict:
 
 def verify_adapter(config_path: str, run: str) -> dict:
     plan = make_plan(config_path)
-    if plan['model'] != SUPPORTED_MODEL:
-        raise LoraContractError('Model not supported in this Ollama pilot')
+    if not isinstance(plan['model'], str) or '/' not in plan['model']:
+        raise LoraContractError('Model not supported for this Ollama export')
     run_dir = _require_directory(Path(run))
     adapter = _require_directory(run_dir / 'final_adapter')
     manifest = verify_manifest(adapter, plan, kind='final_adapter')
@@ -99,7 +99,7 @@ def verify_merge(merged: str) -> dict:
         record = json.loads(metadata_file.read_text('utf-8'))
     except ValueError as exc:
         raise LoraContractError('Invalid merge manifest') from exc
-    if record.get('schema') != 'autotune-ollama-export-v0.9.2' or record.get('model') != SUPPORTED_MODEL:
+    if record.get('schema') != 'autotune-ollama-export-v0.9.2' or not isinstance(record.get('model'), str) or '/' not in record.get('model',''):
         raise LoraContractError('Wrong merge schema or model')
     if record.get('files') != _files(folder):
         raise LoraContractError('Merged files modified or missing')
@@ -120,18 +120,20 @@ def merge_adapter(config_path: str, run: str, destination: str) -> dict:
     import torch
     output.mkdir(parents=True, exist_ok=True)
     try:
+        plan = make_plan(config_path)
         base = AutoModelForCausalLM.from_pretrained(
-            SUPPORTED_MODEL, revision=make_plan(config_path)['revision'],
+            plan['model'], revision=plan['revision'],
             torch_dtype=torch.float32, trust_remote_code=False)
         adapted = PeftModel.from_pretrained(base, proof['adapter_dir'], is_trainable=False)
         merged = adapted.merge_and_unload()
         merged.save_pretrained(str(output), safe_serialization=True)
-        tokenizer = AutoTokenizer.from_pretrained(SUPPORTED_MODEL,
-            revision=make_plan(config_path)['revision'], trust_remote_code=False)
+        tokenizer = AutoTokenizer.from_pretrained(plan['model'],
+            revision=plan['revision'], trust_remote_code=False)
         tokenizer.save_pretrained(str(output))
         record = _write_manifest(output, {
             'schema': 'autotune-ollama-export-v0.9.2',
-            'model': SUPPORTED_MODEL,
+            'model': plan['model'],
+            'revision': plan['revision'],
             'source_config_sha256': proof['config_sha256'],
             'source_adapter': str(Path(proof['adapter_dir']).resolve()),
         })

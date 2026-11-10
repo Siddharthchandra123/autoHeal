@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: autotune-workspace
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: autotune-ai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  # Set storageClassName to a class installed on your cluster when no default exists.

@@ -1,3 +1,114 @@
+# AutoTune AI v0.14.0 — Phase 8 Katib HPO (2026-11-09)
+
+**CURRENT SOURCE CHECKPOINT.** Additive CPU-first Phase 8 implementation on top of the v0.13.1 Knowledge Engine package. Previous user outputs, model weights, `.venv`, MLflow databases and Ollama tags must remain untouched.
+
+## Phase 8 delivered in source
+
+- `autotune/katib.py`: strict Katib Experiment contract, allowlisted bounded search parameters, manifest generation, objective parsing and fail-closed trial ranking.
+- `autotune/katib_cli.py`: offline manifest `render` and result `summarize` commands.
+- `autotune/katib_trial.py`: isolated single-trial worker, explicit `mock` or `hf` backend; mock is the default and synthetic. No nested self-healing retries.
+- `config/katib_cpu.yaml`, `pipelines/autotune_katib_experiment.yaml`, `docs/PHASE8_KATIB_v0.14.0.md`, and `tests/test_katib_phase8.py`.
+- **Verification:** full suite `PYTHONPATH=. pytest -q` -> **367 passed in 8.75s**. Offline manifest render and synthetic worker smoke passed.
+- **NOT verified:** Kubernetes/Katib installation, image build/push, live Katib Experiment/Trial, real HF worker, multi-trial cluster execution, dashboard/MLflow reconciliation. Do not claim distributed execution.
+- Release gate always remains `promotion_approved: false`; human review and independent holdout evaluation remain mandatory.
+
+## Windows PowerShell validation
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m autotune.katib_cli render --spec config/katib_cpu.yaml --output pipelines/autotune_katib_experiment.yaml
+```
+
+See `docs/PHASE8_KATIB_v0.14.0.md` for cluster prerequisites and the acceptance sequence.
+
+---
+
+# AutoTune AI v0.10.0 — Phase 6E Evaluation Quality Gate v1 (2026-11-03)
+
+**CURRENT IMPLEMENTED SOURCE CHECKPOINT.** This is an ADDITIVE, CPU-first Windows PowerShell update on top of v0.9.8 runnable modules and prior v0.9.9 / v0.9.10 document history. Source builds from the v0.9.4 full project, overlaid with v0.9.5 tokenizer correction and v0.9.8 Ollama evaluation module. Nothing writes to users' previous model weights, `.venv`, `.venv-gguf`, `outputs`, `mlflow.db`, or Ollama model tags.
+
+## Delivered / tested this version
+
+- Implemented `autotune/eval_gate.py` with `preflight`, `execute`, `review`; frozen `config/evaluation_gate.yaml`; 60 new pilot questions in `sample_data/eval_gate_pilot.jsonl` (10 each: training diagnostics, data leakage, resume correctness, checkpoint integrity, hyperparameter safety and supply-chain security); and `tests/test_eval_gate_v0100.py`.
+- Designed the 60 questions and rubrics for this pilot; they have **not been independently vetted or adjudicated** by subject-matter reviewers. The questions are new relative to the supplied 16/4 train/validation and 8 older evaluation prompts; preflight checked normalized exact and near-text matches against only those supplied files. Semantic overlap, hidden pretraining contamination, and unknown outside training sets remain unverified. Do NOT call this a clean final independent holdout certification.
+- `preflight`: validates frozen policy/schema/categories/count, rejects duplicates/near duplicates, validates known sources; no network or file mutation.
+- `execute`: only queries local Ollama `/api/tags` and `/api/generate` through existing fixed 127.0.0.1 API; requires real model digests; identical ChatML and fixed temperature 0, seed 42, 384 token limit, 2048 context. Writes `evaluation_results.json` and per-question pseudo-blinded A/B `human_review.csv` under a fresh output directory. Records wall latency, token counts and possible truncation. Formula-injection protection for Excel/Sheets CSV cells. No weights or jobs modified.
+- `review`: validates all 60 scores against unchanged original questions, rubrics and model responses, 0–4 per metric correctness/actionability/safety/calibration, plus explicit yes/no critical failure flags, requires reviewer ID for completion, aggregates per-category scorecards, paired 95% bootstrap exploratory interval, rejects known critical safety failures, threshold gaps, category regressions and unqualified evidence. `promotion_approved:false` and `automated_training_advisor_authorized:false` ALWAYS, even with ideal rubric ratings. Produces `eval_report.json` and `category_summary.csv` to a fresh output folder; incomplete review stays blocked.
+- **BUILD EVIDENCE:** the complete Python project suite passed **308 / 308** on 2026-11-03 after the CSV hardening test, using offline simulated Ollama responses. A local offline preflight of all 60 new questions passed. New v1 live 120-generation baseline/candidate run is NOT executed or user verified. The model labels and digests shown in offline tests are mocks and cannot be used as performance evidence. Existing SmolLM2 GGUF model import was previously user-reported successful.
+- The prior **eight-question human review** gave baseline 3 wins / candidate 2 wins / ties 3 and did not establish improvement. Keep it strictly separate from the new 60-question pilot.
+
+## User acceptance run on Windows PowerShell
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q tests\test_eval_gate_v0100.py
+.\.venv\Scripts\python.exe -m autotune.eval_gate preflight
+ollama list
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+.\.venv\Scripts\python.exe -m autotune.eval_gate execute --output "outputs/eval-gate-$stamp"
+Invoke-Item "outputs\eval-gate-$stamp\human_review.csv"
+.\.venv\Scripts\python.exe -m autotune.eval_gate review --run "outputs/eval-gate-$stamp/evaluation_results.json" --review "outputs/eval-gate-$stamp/human_review.csv" --output "outputs/eval-report-$stamp"
+```
+
+Fill 0–4 scores for **A and B separately**, `A_critical/B_critical` as `yes`/`no`, and `reviewer_id`. Score honestly; incomplete answers and truncation are not successes. Do not edit ID, category, prompt, rubric, or answer cells. The blind mapping is deterministic, not cryptographically secret. Do not inspect model identity inside the JSON until after review. Use a fresh output path every time. Verify installed Ollama tags against policy and adjust names only if needed, freezing new policy SHA-256 in the run.
+
+## Next after v0.10.0
+
+1. Real 60-question Ollama A/B run and double-check installed model digests, truncation, reviewer scoring. The 60-question pilot is for engineering acceptance, **not** final independent certification.
+2. Independent human rubric/critical-item validation; improve prompt set and design a new genuinely untouched final holdout without training on it.
+3. Implement Security Sprint S0: pinned Hugging Face revisions, pip-audit/npm audit and supply-chain gates, dataset privacy/poisoning triage.
+4. Live local MLflow viewer and Next.js acceptance, followed by Kubeflow pipelines/Katib trials once ready.
+
+## Security boundaries
+
+No hosted Meta API active; no actual vulnerability scanner, source attestation or automatic production promotion added by this sprint. SHA-256 digests are artifact identity/integrity evidence, not proof the weights are safe. Critical-item judgments require human reviewers. The limited simulated unit tests are not equivalent to actual model inference correctness.
+
+---
+
+# CURRENT CHECKPOINT - v0.9.9 (2026-11-03) - qualitative Ollama comparison reviewed
+
+**This version is a documentation and human-review checkpoint only.** Source code is unchanged from v0.9.8; do not overwrite existing user `outputs/`, Ollama models, `.venv`, `.venv-gguf`, or `mlflow.db`. Preserve the full history below.
+
+## User-provided results / human rubric review
+
+- User provided a TSV containing **8 held-out-looking prompts** with `prompt`, `rubric`, `baseline_response`, `candidate_response`, `baseline_eval_count`, `candidate_eval_count`, and blank review columns. Treat this as an exploratory comparison. The split's true independence and semantic decontamination are NOT externally verified.
+- A qualitative rubric review found **baseline 3 wins, candidate 2 wins, ties 3**, with no consistent evidence the fine-tuned model improved. See `AutoTune_AI_Ollama_Human_Review_v0.9.9.csv` and `AutoTune_AI_Ollama_Evaluation_Report_v0.9.9.md`.
+- `eval_count` indicates generated output tokens, **not** evaluation score. Most records hit the 128-token limit; some outputs appear truncated.
+- Severe deficiencies in both outputs: neither clearly rejects mismatched checkpoint digests (q4), neither addresses learning-rate schedule discontinuity on resume (q3), neither enforces learning-rate safety budgets (q5), neither treats near-equal validation losses carefully (q8). Candidate invents an invalid loss formula (q8).
+- No promotion approval; do not interpret slight validation-loss differences, a successful model import, or this eight-prompt response sheet as proof of safe, superior performance.
+
+## Next steps
+
+1. Use this sheet for failure analysis only; keep a separate, unseen final holdout set.
+2. Expand to >=40-80 diverse, independently curated examples with numeric correctness/safety/calibration rubrics and blinded human scoring, ideally more before making deployment claims.
+3. Record both model digests and evaluation config, use sufficient token budget, repeat deterministically where possible, and inspect variance and truncation.
+4. Strengthen training data or choose a larger CPU-feasible model if tiny 135M base capability is the limiting factor; do not train on the final evaluation prompts.
+5. Continue S0 security scanner gates, dashboard live acceptance, and eventual Kubeflow/Katib orchestration. Keep CPU-first.
+
+---
+
+# CURRENT CHECKPOINT - v0.9.8 (2026-11-03) - SmolLM2 Ollama deployment reported successful, evaluation harness built
+
+**Read this first.** This is a CPU-first Windows VS Code project. The user's message **"all worked"** confirms the v0.9.7 tokenizer -> GGUF -> Ollama create/run steps completed on their machine. This is a **user-reported acceptance result without copied terminal logs**, not an independently reproduced load or performance benchmark. Preserve all previous `outputs/`, `.venv`, `.venv-gguf`, `mlflow.db`, and installed model tags.
+
+## New v0.9.8 implementation and status
+
+- Added `autotune/ollama_compare.py`, `sample_data/ollama_heldout_eval.jsonl`, `tests/test_ollama_compare_v098.py` and `docs/PHASE6D_OLLAMA_EVALUATION_v0.9.8.md`.
+- The evaluation code works against local Ollama only: `/api/tags` to validate installed model names/digests, `/api/generate` with fixed ChatML prompt, `raw:true`, `temperature:0`, `seed:42`, `num_predict:128` and `num_ctx:2048`. Baseline default `smollm2:135m-instruct-fp16`; candidate default `autotune-smollm2:gguf-v095`. The user should replace tags if `ollama list` differs.
+- The comparison checks exact held-out question overlap against the bundled 16/4 SmolLM2 JSONL train/validation examples; this does NOT prove semantic non-overlap or generalized model quality. CSV human grading is required; model promotion stays false.
+- The standalone comparison suite: **13/13 targeted offline tests passed**, and offline preflight of 8 held-out items succeeded. Full inherited regression test attempt did not complete in the build environment; do not claim the cumulative suite was reverified in v0.9.8.
+- Live Ollama comparison was **NOT** run in this environment; user Windows acceptance and quality evaluation still pending.
+
+## Immediate next instructions
+
+1. Overlay the v0.9.8 patch in `autoHeal_finetune` without touching model output artifacts.
+2. Run `ollama list`; then `ollama pull smollm2:135m-instruct-fp16` to obtain same-size original baseline (FP16 tag supported by Ollama).
+3. Run `python -m pytest -q tests/test_ollama_compare_v098.py` and `python -m autotune.ollama_compare` using `.venv`.
+4. Run `python -m autotune.ollama_compare --execute --output outputs/ollama-comparison-<freshstamp>` and complete manual review CSV.
+5. Document response comparison and local Ollama model digests; model inference availability is NOT equivalent to quality/safety approval.
+6. Resume security sprint S0 and live Next.js dashboard acceptance; Kubeflow/Katib/Unsloth GPU are still planned or unverified.
+
+---
+
 # CURRENT CHECKPOINT - v0.9.0 (2026-11-02) - Phase 6B, read-only dashboard
 
 **IMPORTANT: Start here to resume work.** The latest executable project release is **v0.9.0**. Earlier AGENTS history continues below. The project is CPU-first on Windows VS Code and uses local MLflow. Preserve all previously successful user experiment folders under `outputs/`; none are in the source archive.
@@ -418,3 +529,182 @@ Opt-in live test after separately installing `openai`: `python -m autotune.advis
 - **Security:** refuse unexpected model ID and wrong CPU backend, reject nonempty output folders and symlinks, reject modified merged artifacts, `trust_remote_code=False`, only merge verified PEFT adapter. Model is currently revision `main` (P0 to pin a full immutable HF commit before sensitive use). SHA256 is an integrity check, not provenance/benign-code proof. Never load third-party checkpoint pickle directly.
 - **Immediate user steps:** apply v0.9.2 patch preserving `.venv`, `outputs`, `mlflow.db`; `python -m autotune.ollama_bridge plan --config config/lora_smollm2_ollama_cpu.yaml`; real `hf_models_cli --execute` into `outputs/smollm2-ollama-01`; `ollama_bridge verify`; `merge`; `verify-merge`; `modelfile --merged`; `ollama create` and `ollama run`. GGUF optional fallback; full instructions in `docs/PHASE6C_HF_TO_OLLAMA_CPU_v0.9.2.md`.
 - **Next:** user live-verifies CPU fine-tune/adapter merge/Ollama import; then add registered artifact evaluation + security gates + automated self-healing for this backend; pending Next.js live dashboard verification and Kubeflow/Katib orchestration remain.
+
+
+---
+## v0.9.3 checkpoint — 2026-11-02, Ollama Windows Safetensors import blocked
+- **Observed on user's Windows machine:** `ollama_bridge modelfile` returned `ok:true` for the merged SmolLM2 directory. `ollama create` failed with `MLX runtime is not available`; subsequent `ollama run` could not locate a model manifest because creation never succeeded.
+- **Not a demonstrated training failure:** Preserve `outputs/smollm2-ollama-01` (fine-tune), `outputs/smollm2-ollama-merged-01` (merged weights), and existing MLflow artifacts.
+- **Decision:** Prefer GGUF conversion of the already merged model using the official llama.cpp `convert_hf_to_gguf.py`, then `ollama create` with a new GGUF Modelfile. Isolate converter in `.venv-gguf` to avoid disturbing the working trainer dependencies.
+- **Available v0.9.2 commands:** `python -m autotune.ollama_bridge verify-merge --merged ...`; `python -m autotune.ollama_bridge modelfile --gguf ... --output ...`.
+- **Verification status:** Documented and source-checked; GGUF conversion and Ollama import have **not yet been executed on the user's machine**. No code or new regression tests in v0.9.3.
+- **Next user verification:** Run exact commands in `AutoTune_AI_Ollama_GGUF_Windows_Fix_v0.9.3.md`, paste converter output and `ollama create` result. If successful, run model inference and compare with original base model qualitatively.
+
+
+---
+## v0.9.4 - SmolLM2 GGUF tokenizer-compatibility recovery (2026-11-02)
+
+- **User observed:** llama.cpp GGUF conversion of `outputs/smollm2-ollama-merged-01` failed in the tokenizer stage. `tokenizer.model` was absent (normal for this GPT-2-style BPE tokenizer); fallback `AutoTokenizer.from_pretrained` then raised `AttributeError: 'list' object has no attribute 'keys'`. This is a tokenizer metadata / Transformers compatibility issue, **not evidence that LoRA training or merged weights failed**.
+- **Upstream reference:** ggml-org/llama.cpp issue #24460 documents the same exception; see https://github.com/ggml-org/llama.cpp/issues/24460.
+- **Implemented:** `autotune/gguf_tokenizer_fix.py` stages a verified merged model into a fresh directory, never changing the canonical export. It normalizes list-form `extra_special_tokens` to `{}` only when entries are already present in `additional_special_tokens`; otherwise it stops for manual review. Source manifest is validated before copy. The staged conversion copy deliberately does not carry the original now-invalid export manifest, and records a separate provenance JSON. Symlinks and nonfresh staging outputs are rejected.
+- **Testing:** 7 targeted offline tests passed; cumulative 265/265 Python tests passed from the v0.9.2 full source plus this patch in build environment. No user Windows conversion run has yet passed.
+- **Next:** Apply the v0.9.4 patch without overwriting `outputs/`; run `verify-merge`, stage to `outputs/smollm2-gguf-stage-01`, run a local tokenizer load with `.venv-gguf`, then `convert_hf_to_gguf.py` against the staged folder, import the resulting GGUF into Ollama with a fresh model tag, and verify prompt response. No model retraining needed.
+- **Status boundary:** No changed model weights or Hugging Face training code. No claim of successful GGUF export or Ollama model import until user provides terminal evidence.
+- **Documentation:** `AutoTune_AI_Handbook_v0.9.4.pdf`, `AutoTune_AI_Master_Execution_Plan_v0.9.4.md`, `AutoTune_AI_GGUF_Tokenizer_Fix_v0.9.4.md`; source patch with tests.
+
+---
+## v0.9.5 - GGUF tokenizer registry-preserving fix (2026-11-02)
+
+- **User-reported blocker:** `LoraContractError: List contains tokens absent from additional_special_tokens; manual review required` in v0.9.4 `gguf_tokenizer_fix.py` line 58. v0.9.4 guard was overly restrictive; its rejection should not be interpreted as damaged model weights.
+- **Root cause:** list-form `extra_special_tokens` can contain model-specific specials that are not repeated in `additional_special_tokens`. Converter's Transformers may additionally require `extra_special_tokens` to be a mapping.
+- **Implementation:** replaced hard subset rule. Migrate only tokens independently marked `special: true` in local `added_tokens_decoder` or `tokenizer.json`; reject unknown, contradictory, non-special or malformed metadata. Merge verified token names into `additional_special_tokens` (deduplicated), set `extra_special_tokens` to `{}` in a new staging copy, and retain original decoder, tokenizer data, chat template and model weights. Rehash all non-tokenizer files after copying. Preserve canonical merge and SHA-256 manifest.
+- **Files:** `autotune/gguf_tokenizer_fix.py`, `tests/test_gguf_tokenizer_fix_v095.py`; Windows guide `AutoTune_AI_GGUF_Tokenizer_Windows_Runbook_v0.9.5.md`. No model-training code changed.
+- **Verification:** 7 additional targeted tests (14 v0.9.4 + v0.9.5 tokenizer tests), **272/272 cumulative Python tests passed in build environment**. No Windows v0.9.5 staging or GGUF conversion executed.
+- **Next:** apply patch into existing `autoHeal_finetune`; verify merge; stage to **fresh** `outputs/smollm2-gguf-stage-02`; inspect migrated tokens; load staged tokenizer using `.venv-gguf`; convert to F16 GGUF and import under a new Ollama tag. Preserve `.venv`, `outputs` and `mlflow.db`.
+- **Safety:** If a token is unverified or has conflicting flags, stop and inspect local tokenizer metadata. Do not disable checks, delete token entries, or overwrite the verified merged model. This patch does **not** claim to have fixed the user's environment until they run it.
+- **Handbook:** `AutoTune_AI_Handbook_v0.9.5.pdf` (cumulative + new appendix).
+
+
+## v0.9.6 - Windows PowerShell quoting correction (2026-11-03)
+- **Reported runtime symptom:** `python -c` on `.venv-gguf` raised `SyntaxError: leading zeros in decimal integer literals are not permitted`. The displayed Python code had `AutoTokenizer.from_pretrained(outputs/smollm2-gguf-stage-02, ...)` without quotes. No tokenization or conversion was attempted by that failing command.
+- **Root cause:** Shell/argument quotation stripping in the original single-quoted PowerShell command containing double-quoted Python path.
+- **Correct command:** ` .\.venv-gguf\Scripts\python.exe -c "from transformers import AutoTokenizer; t=AutoTokenizer.from_pretrained('outputs/smollm2-gguf-stage-02', local_files_only=True); print(type(t).__name__, len(t))" `
+- **Verify stage:** `Test-Path .\outputs\smollm2-gguf-stage-02\tokenizer_config.json` should be `True` before test.
+- **Next:** If tokenizer loads, repeat the `llama.cpp` F16 GGUF conversion with the existing staged copy. If not, diagnose the *new* traceback without removing tokenizer metadata or editing verified merged weights.
+- **Verification boundary:** Guidance only; no local Windows run verified, no new source edits, new automated tests, or successful GGUF conversion asserted.
+- **Handbook:** `AutoTune_AI_Handbook_v0.9.6.pdf` (96 pages total, cumulative).
+
+
+## v0.9.7 — GGUF deployment verification checklist (2026-11-03)
+- **User request:** "what next" after a PowerShell `python -c` quoting error during staged tokenizer verification.
+- **Status:** No new user terminal verification of staged-tokenizer load, GGUF conversion, `ollama create`, or `ollama run`. No source-code modifications or training tests performed in this documentation checkpoint.
+- **Action:** First rerun the corrected PowerShell tokenizer command against `outputs/smollm2-gguf-stage-02` in `.venv-gguf`; after success run `llama.cpp/convert_hf_to_gguf.py` to fresh `outputs/smollm2-finetuned-v095-f16.gguf`; verify file; create `outputs/smollm2-gguf-v095.Modelfile` from `--gguf`; run `ollama create autotune-smollm2:gguf-v095` and a short inference smoke test. Exact commands in handbook v0.9.7 final page.
+- **Acceptance:** local tokenizer class + vocab output, nonzero GGUF, successful Ollama create/list/run. Separate model-quality evaluation remains pending. Do not overwrite original merged model, adapter, previous runs, or MLflow DB.
+- **Next engineering work after deployment acceptance:** Baseline/fine-tuned comparison, live Next.js dashboard acceptance, Security Sprint S0, Kubeflow/Katib CPU-first orchestration.
+
+---
+## v0.9.10 - Evaluation Quality Gate v1 planning checkpoint (2026-11-03)
+
+**User question:** What should come next after v0.9.9 evaluation of original versus fine-tuned SmolLM2 in Ollama?
+
+**Evidence retained:** Eight-prompt exploratory review; 2 candidate wins, 3 baseline wins, 3 ties. Many outputs capped at 128 generated tokens. Model-quality improvement is **not proven**. Candidate errors include fabricated validation-loss formula, failure to reject a checksum-mismatched checkpoint, and incomplete recovery policy advice. The dataset is too small for model-promotion decisions. Ollama GGUF inference user-reported successful; model quality gate remains blocked.
+
+**Next engineering sprint:** Phase 6E - Evaluation Quality Gate v1 (planning only in this update). Build a new independently held-out, decontaminated 60-prompt pilot suite, stratified into at least six relevant MLOps/security domains (10 per domain), and leave the previous eight prompts as exploratory development examples, not final hidden-test items. Run original and fine-tuned models with matched prompts, inference templates and decoding settings, 256-384 output-token budget, recorded models/digests, data hash and timestamps. Distinguish token counts from correctness scores. Capture latency and truncation.
+
+**Scoring/gating:** Per prompt rubric: correctness, actionability, safety, calibrated uncertainty; each 0-4 with independent critical security red flags. Blind manual adjudication or calibrated human-review workflow for disagreements. Paired results per domain; confidence intervals where sample size permits; no meaningful improvement claim from a tiny win count or near-identical loss. No automatic deployment based on one pilot. Proposed acceptance baseline: zero unresolved critical safety failures; no substantial category regression; candidate must show evidence of improvement on independent test; human signoff required. These are DESIGN REQUIREMENTS, not implemented controls.
+
+**Subsequent order:** (1) Security Sprint S0: pip-audit/dependency lock, trusted HF revisions, dataset hygiene, quarantine events; (2) verify Windows Next.js viewer and MLflow read-only API; (3) CPU-first Kubeflow pipelines; (4) Katib primary optimizer; (5) live Meta advisor under the existing policy gate. Ollama small model should remain untrusted to make autonomous safety-critical decisions until it passes suitable evaluation.
+
+**Verification boundary:** This v0.9.10 work adds documentation and a proposal only. No new inference, model training, API integration, automated benchmark tests, or security scanners were executed. Existing model artifacts and experiment folders untouched. Source remains at the prior state including the v0.9.8 evaluation harness; v0.9.9 was human-review documentation.
+
+**Next code work:** implement `autotune/eval_gate.py` and `config/evaluation_gate.yaml`, scorecard JSON/CSV + reproducible metadata, holdout contamination tests and promotion refusal. Test with stubs first, then run real local Ollama A/B evaluation.
+
+
+## 2026-11-04 — v0.11.0 Phase 7A: Knowledge Engine foundation
+- Added `autotune.knowledge_engine`: local FastAPI upload and ingestion service.
+- Supports TXT/MD/CSV/JSON/JSONL natively; PDF/DOCX via optional parsers.
+- Adds 20 MB upload cap, extension allowlist, safe basename handling, SHA-256 duplicate detection, SQLite document/chunk metadata, overlapping chunking and source-passage JSONL export.
+- Export explicitly sets `fine_tuning_ready=false`; no synthetic assistant answers or training run is silently created.
+- Added `requirements-knowledge.txt`, Phase 7A runbook and six offline tests.
+- Verification in build environment: `python -m pytest -q tests/test_knowledge_engine_v011.py` → 6 passed.
+- Not verified: live Windows browser upload, optional PDF/DOCX extraction, OCR, vector search/RAG, QA generation, SFT integration, multi-model orchestration, authentication or production deployment.
+- Next: add retrieval/indexing; source-grounded QA generation with validation and review; response-only SFT JSONL export; integrate candidate-model fine-tuning only after data-quality and held-out evaluation gates.
+
+
+---
+
+# CURRENT CHECKPOINT - v0.12.0 (2026-11-04) - Phase 7 Knowledge Engine implemented
+
+## Current deliverable
+
+- `autotune/knowledge_engine.py`: local FastAPI document ingestion and API routes for retrieval, RAG, dataset generation and fine-tuning jobs. Store root is configurable with `AUTOTUNE_KNOWLEDGE_HOME`; default is `knowledge_store`.
+- `autotune/retrieval.py`: SQLite FTS5 lexical retrieval, optional CPU sentence-transformer embedding store, semantic search and reciprocal-rank hybrid fusion. Embeddings are downloaded/indexed only after an explicit request; the loaded encoder is cached; auto mode falls back to FTS5.
+- `autotune/rag.py`: local Ollama question answering with exact chunk/quote verification. Lexical support is a weak screen, not entailment proof.
+- `autotune/dataset_factory.py`: local Ollama Q/A generation, exact source quote and lexical support gates, duplicate question filtering, basic PII/key-pattern checks, grouped source-disjoint splits and dataset manifest (minimum four distinct documents for 80/10/10 document-group split). PII heuristics are incomplete.
+- `autotune/lora_contract.py` + `autotune/lora_gpu.py`: structured `messages` dataset support, model chat template support, assistant-only response loss mask (`-100` for prompt/padding), reject-too-long policy; legacy text path preserved.
+- `autotune/knowledge_orchestrator.py`: sequential candidate models and bounded LR trials; immutable HF revision pinning on execution; one trial at a time; held-out baseline-vs-adapter token-F1; `NO_QUALIFIED_MODEL`; always fail closed for production.
+- `autotune/model_evaluator.py`: same test examples scored for base and LoRA adapter using token F1 / exact match; metric is lexical overlap, not model-quality certification.
+- `autotune/knowledge_jobs.py`: one local sequential worker with atomic persistent JSON job status; active-state cleanup is protected if persistence/submission fails.
+- `autotune/ollama_bridge.py`: generic HF model adapter integrity check / merge / Modelfile / optional GGUF path.
+- `web/app/knowledge/page.tsx`: dashboard UI source for upload, search, ask, embedding index, dataset generation and training job monitor. `run_phase7.ps1` launches API and optionally the Next dev server.
+- `docs/PHASE7_KNOWLEDGE_ENGINE_v0.12.0.md`: complete Windows operations/runbook; cumulative handbook source and versioned handbook PDF.
+
+## Candidate registry / training policy
+
+`config/knowledge_candidates.json`: Qwen3-0.6B (thinking disabled), Qwen2.5-0.5B-Instruct, SmolLM2-360M-Instruct; all configured CPU, q_proj/v_proj LoRA, two LR trials. Default minimum dataset rows: 100 train / 20 validation / 20 test. These are starter minimums, not statistical sufficiency. `--allow-small-data` only for smoke runs. Never compare raw validation loss across different tokenizers/model families. Candidate selection is a held-out token-F1 shortlist and does not grant production approval.
+
+## Build verification - do not overstate
+
+- `PYTHONPATH=. pytest -q`: **338 passed in 9.31s** in build environment.
+- Actual user Windows run not yet performed for v0.12.0.
+- Not executed: live Ollama generation, embedding download/index, HF Hub revision lookup, HF model-weight downloads, LoRA model training/evaluation, Ollama merge/import/GGUF, npm install/typecheck/build/browser smoke. npm install attempt in build env timed out.
+- API has no authentication: bind only to `127.0.0.1`; don't expose over LAN/public networks.
+- PDF scanned-image OCR, full PII/secret discovery, formal entailment, prompt-injection immunity, production auth/multi-tenancy are not implemented.
+
+## Windows PowerShell startup
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\run_phase7.ps1
+# Optional: .\run_phase7.ps1 -InstallSemanticSearch
+# Optional: .\run_phase7.ps1 -InstallTrainingDependencies
+# Optional: .\run_phase7.ps1 -StartDashboard
+```
+
+Full run instructions and API contracts are in `docs/PHASE7_KNOWLEDGE_ENGINE_v0.12.0.md`. Preserve existing `outputs/`, `.venv*`, MLflow DB and previously verified adapters when overlaying this release.
+
+
+# CURRENT CHECKPOINT - v0.13.0 (2026-11-09) - Knowledge Engine Scale & Reliability
+
+## Delivery changes
+
+- `autotune/knowledge_ingest.py`: memory-bounded ingestion pipeline. HTTP uploads are streamed to a staged file in 1 MiB blocks with incremental SHA-256; extraction is incremental for TXT/MD, CSV, JSONL, large JSON (ijson), PDF pages and DOCX paragraphs; chunking uses a bounded rolling buffer; SQLite/FTS rows commit in batches. The synchronous `ingest(filename, data)` wrapper remains for tests/scripts only.
+- `autotune/knowledge_engine.py`: defaults changed to 512 MiB per upload and 100,000,000 extracted characters, both overrideable through environment variables. Added progress/status fields, source-offset schema, additive migration, WAL/busy timeout, `/api/knowledge/stats`, and retry route.
+- `autotune/retrieval.py`: embedding build streams SQLite rows in bounded batches; semantic search uses a top-k heap rather than loading all vectors; vector SHA-256 validation and indexed-document filtering are enforced. This remains exact linear-time search, not ANN.
+- `autotune/rag.py`: verified citations include chunk index and normalized character offsets where present.
+- `web/app/knowledge/page.tsx`: dashboard displays live limits, document status, extracted characters/chunks, progress and a retry control; polls while ingestion is queued/indexing.
+- `docs/PHASE7_KNOWLEDGE_ENGINE_v0.13.0.md`: current Windows runbook and scale design. `docs/HANDBOOK_SOURCE.md` and `AutoTune_AI_Handbook_v0.13.0.pdf` are cumulative.
+
+## Verification
+
+- `PYTHONPATH=. pytest -q`: **346 passed in 8.75 seconds** in the build environment.
+- TSX syntax transpilation using the installed TypeScript compiler: zero diagnostics.
+- Full Next.js dependency install/typecheck/build/browser acceptance not run; npm dependencies were not installed in this environment.
+- No real 100M-character document, live Ollama call, embedding model download/indexing, or HF fine-tuning was run.
+
+## Resource defaults / PowerShell
+
+- `AUTOTUNE_MAX_FILE_BYTES=536870912` (512 MiB)
+- `AUTOTUNE_MAX_CHARS=100000000` (100M extracted characters)
+- `AUTOTUNE_CHUNK_SIZE=1200`, `AUTOTUNE_CHUNK_OVERLAP=160`, `AUTOTUNE_INGEST_BATCH_CHUNKS=500`
+- `AUTOTUNE_MAX_PDF_PAGES=10000`
+
+Set overrides in the PowerShell process environment before starting `run_phase7.ps1`; `.env.example` documents values but is not auto-loaded. Keep the unauthenticated service bound to `127.0.0.1`. Back up the complete `knowledge_store` directory before replacing source files.
+
+**Release boundary:** code and offline tests cover the bounded streaming path; the configured 100M-character cap is not a measured performance guarantee. Individual PDF pages/CSV rows/JSONL records can still be materialized, semantic exact-scan has O(N) latency, OCR/authentication/full production multi-tenancy are still future work.
+
+# CURRENT CHECKPOINT - v0.13.1 (2026-11-09) - Responsive Dataset Generation and Dolly Import
+
+## Delivery changes
+
+- `autotune/dataset_factory.py`: recognizes existing supervised JSONL records (`instruction`/`response`, including Dolly; `prompt`/`completion`; `question`/`answer`; `input`/`output`; structured messages) and imports them directly into SFT chat messages without Ollama regeneration. Duplicate conversations and configured PII-like patterns are filtered. Record-level split IDs retain document/line provenance.
+- `autotune/dataset_jobs.py`: persistent local background-job state, atomic JSON status updates, a single active generation job per API process, and explicit interrupted/failed/completed states.
+- `autotune/knowledge_engine.py`: `/api/knowledge/datasets/generate` returns HTTP 202; added a generation-job polling endpoint. Ollama chunk default is reduced to 100.
+- `autotune/knowledge_orchestrator.py`: leakage validation uses manifest `source_units` when present, supporting document-disjoint generated Q/A and record-disjoint one-file supervised data.
+- `web/app/knowledge/page.tsx`: polls generation state and displays stage/progress/results; shows whether splits are source-record or source-document disjoint.
+- `docs/KNOWLEDGE_ENGINE_DATASET_GENERATION_V0131.md`: Windows runbook, API contracts, Dolly import and split semantics.
+
+## Verification
+
+- `PYTHONPATH=. python -m pytest -q`: **351 passed** in the build environment.
+- The Knowledge Engine TSX transpiled with zero syntax diagnostics using the installed TypeScript compiler.
+- Full npm/Next.js typecheck/build, live Ollama generation, actual Windows browser interaction and model fine-tuning were not run.
+- Direct Dolly import was tested with a synthetic Dolly-shaped JSONL file and through the FastAPI background-job flow; this does not claim a live import of the user's actual Dolly file.
+
+## Operational notes
+
+- Stop the v0.13.0 API before overlaying v0.13.1. A pending old synchronous generation call is not migrated; stop/restart and submit a new job.
+- Preserve `knowledge_store` when upgrading. The retained uploaded `.jsonl` source is required by direct import.
+- One-file Dolly splits are record-disjoint, not document-disjoint. The manifest records `source_unit_kind: record`, unique per-record `source_units`, and original `source_documents` provenance.
+- Ordinary document-grounded generation still uses local Ollama and requires four distinct source documents for document-level splits. It now reports progress through the background job route.
+- Keep the unauthenticated local API bound to `127.0.0.1`; run a single API worker for in-process background job execution.

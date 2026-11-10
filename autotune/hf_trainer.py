@@ -3,6 +3,17 @@ from pathlib import Path
 from .metrics import MonitorStream
 from .mock_trainer import RunResult
 from .tracking import Tracker
+import re
+
+
+def _target_modules(config: dict) -> list[str]:
+    """Use model-specific LoRA targets from the pinned training config."""
+    values = config.get("hf", {}).get("target_modules", ["q_proj", "v_proj"])
+    if (not isinstance(values, list) or not values or
+            any(not isinstance(x, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{1,80}", x) for x in values) or
+            len(set(values)) != len(values)):
+        raise ValueError("hf.target_modules must be a non-empty unique list of safe module names")
+    return values
 
 
 def train(config: dict, trial_dir: Path, trial: int) -> RunResult:
@@ -64,7 +75,7 @@ def train(config: dict, trial_dir: Path, trial: int) -> RunResult:
     model = get_peft_model(model, LoraConfig(
         task_type=TaskType.CAUSAL_LM, r=int(trcfg['lora_r']),
         lora_alpha=int(trcfg['lora_alpha']), lora_dropout=float(trcfg['lora_dropout']),
-        target_modules=['q_proj','v_proj']))
+        target_modules=_target_modules(config)))
     args = TrainingArguments(
         output_dir=str(trial_dir/'checkpoints'),
         learning_rate=float(trcfg['learning_rate']),

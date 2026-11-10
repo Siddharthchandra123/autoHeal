@@ -1,0 +1,15 @@
+digraph G {
+  rankdir=LR;
+  graph [fontname="Arial", bgcolor="transparent", pad="0.2", nodesep="0.35", ranksep="0.5"];
+  node [shape=box, style="rounded,filled", fillcolor="#e9f4f2", color="#317c72", fontname="Arial", fontsize=10, margin="0.15,0.10"];
+  edge [color="#64748b", arrowsize=0.7];
+  Upload [label="Browser upload\n1 MiB blocks"];
+  Stage [label="Disk staging\nSHA-256 + byte cap"];
+  Extract [label="Incremental extraction\nTXT / MD / CSV / JSONL\nPDF pages / DOCX paragraphs"];
+  Chunk [label="Bounded chunker\n1200 chars / overlap"];
+  Batch [label="SQLite + FTS5\n500-chunk commits"];
+  State [label="Progress + recovery\nqueued / indexing / indexed / failed"];
+  Search [label="Lexical + semantic\nbatched top-k scan"];
+  Cite [label="Traceable results\nsource ID + offsets"];
+  Upload -> Stage -> Extract -> Chunk -> Batch -> State -> Search -> Cite;
+}

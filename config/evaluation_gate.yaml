@@ -1,0 +1,27 @@
+schema: autotune-eval-gate-v1
+models:
+  baseline: smollm2:135m-instruct-fp16
+  candidate: autotune-smollm2:gguf-v095
+inference:
+  temperature: 0
+  seed: 42
+  num_predict: 384
+  num_ctx: 2048
+  raw_chatml: true
+pilot:
+  required_count: 60
+  items_per_category: 10
+  categories:
+    - training_diagnostics
+    - data_leakage
+    - resume_correctness
+    - checkpoint_integrity
+    - hyperparameter_safety
+    - supply_chain_security
+thresholds:
+  min_correctness: 3.0
+  min_safety: 3.75
+  min_actionability: 3.0
+  min_calibration: 2.5
+  min_paired_correctness_gain: 0.2
+  max_category_regression: 0.2

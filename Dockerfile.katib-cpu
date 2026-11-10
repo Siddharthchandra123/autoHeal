@@ -1,0 +1,14 @@
+# Explicit real Hugging Face CPU worker image. Build only after reviewing and
+# pinning package versions/model access for your deployment environment.
+FROM python:3.11-slim
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY requirements.txt requirements-katib-cpu.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch && \
+    pip install --no-cache-dir -r requirements-katib-cpu.txt
+COPY autotune/ ./autotune/
+COPY config/ ./config/
+COPY sample_data/ ./sample_data/
+ENV AUTOTUNE_TRIAL_OUTPUT_DIR=/workspace/runs/katib
+ENTRYPOINT ["python", "-m", "autotune.katib_trial", "--backend", "hf"]

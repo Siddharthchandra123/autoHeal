@@ -1,0 +1,20 @@
+digraph Phase7KnowledgeEngine {
+  graph [rankdir=LR, bgcolor="transparent", pad="0.25", nodesep="0.42", ranksep="0.55", fontname="Arial", label="AutoTune AI v0.13.0 - Phase 7 Knowledge Engine", labelloc="t", fontsize=18];
+  node [shape=box, style="rounded,filled", fillcolor="#eef5f8", color="#4c6578", fontname="Arial", fontsize=10, margin="0.16,0.10"];
+  edge [color="#4c6578", penwidth=1.2, arrowsize=0.75];
+  upload [label="7A  Upload + extract\nSHA-256 / SQLite / chunks"];
+  retrieve [label="7B  Knowledge retrieval\nFTS5 + optional embeddings\nHybrid reciprocal-rank fusion"];
+  rag [label="7C  Grounded RAG\nLocal Ollama + exact quote checks"];
+  dataset [label="7D  Dataset factory\nEvidence gates + source-disjoint splits\nStructured messages JSONL"];
+  train [label="7E  Sequential LoRA trials\nQwen3 / Qwen2.5 / SmolLM2\nResponse-only loss + revision pinning"];
+  evaluate [label="Held-out evaluator\nBase vs adapter token-F1\nShortlist or NO_QUALIFIED_MODEL"];
+  export [label="Artifact export\nVerify / merge / Modelfile / GGUF"];
+  approval [label="Human release gate\nProduction approval remains false", fillcolor="#fff3d9", color="#9a7533"];
+  ui [label="7F  Next.js dashboard\nUpload / search / ask / jobs", fillcolor="#e8f4ef", color="#4d806b"];
+  upload -> retrieve -> rag;
+  retrieve -> dataset -> train -> evaluate -> export -> approval;
+  ui -> upload [style=dashed, color="#4d806b"];
+  ui -> retrieve [style=dashed, color="#4d806b"];
+  ui -> dataset [style=dashed, color="#4d806b"];
+  ui -> train [style=dashed, color="#4d806b"];
+}

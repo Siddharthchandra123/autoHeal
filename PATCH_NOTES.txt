@@ -1,0 +1,7 @@
+AutoTune AI v0.13.1 dataset generation fix
+
+Overlay the contents of this archive into your existing AutoTune_AI project root. It preserves your knowledge_store folder because no uploaded documents or database files are included. Allow source-file overwrites.
+
+After applying: stop the old API/frontend terminals (Ctrl+C), start the API once with .\run_phase7.ps1 (this creates a light .venv-phase7 without PyTorch), start the frontend in a second terminal with cd web; npm run dev, then open http://127.0.0.1:3000/knowledge. On later API starts use .\run_phase7.ps1 -SkipInstall.
+
+The old v0.13.0 synchronous generation request will not resume; click Build fine-tuning dataset again. Dolly-style JSONL is imported directly, without Ollama or PyTorch.

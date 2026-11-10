@@ -32,14 +32,14 @@ def test_planning_has_no_weight_download(monkeypatch):
     assert make_ollama_plan(CONFIG)['ok']
 
 
-def test_non_supported_model_rejected(tmp_path):
+def test_model_generic_export_plan_accepts_registered_model_shape(tmp_path):
     import yaml
     config = yaml.safe_load(Path(CONFIG).read_text())
     config['model']['name'] = 'someone/another-model'
     path = tmp_path / 'config.yaml'
     path.write_text(yaml.safe_dump(config))
-    with pytest.raises(LoraContractError, match='only'):
-        make_ollama_plan(str(path))
+    plan = make_ollama_plan(str(path))
+    assert plan['model'] == 'someone/another-model'
 
 
 def test_wrong_device_rejected(tmp_path):

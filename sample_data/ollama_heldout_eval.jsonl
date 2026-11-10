@@ -1,0 +1,8 @@
+{"id":"q1","prompt":"My training loss is decreasing, but validation loss has increased three evaluations in a row. What does that suggest and what should I inspect?","rubric":"Identify possible overfitting; inspect data split, learning rate and regularization; avoid certain diagnosis"}
+{"id":"q2","prompt":"Why might a model give misleadingly good validation results when near-identical texts appear in training and validation?","rubric":"Explain evaluation leakage and biased generalization estimates"}
+{"id":"q3","prompt":"An optimizer restart loads model weights but not scheduler state. Explain one risk.","rubric":"Discuss mismatched learning-rate schedule or discontinuous optimization"}
+{"id":"q4","prompt":"What should a training system do if the recorded checkpoint digest differs from the checkpoint file's computed digest?","rubric":"Reject loading, investigate and do not trust the artifact"}
+{"id":"q5","prompt":"How can a training agent evaluate whether a proposed new learning rate is safe before retraining?","rubric":"Validate numeric bounds, compare to prior setting, impose budgets"}
+{"id":"q6","prompt":"What is one reason a low loss on a toy language dataset does not demonstrate general intelligence?","rubric":"Mention small/biased data and generalization limitations"}
+{"id":"q7","prompt":"Explain the distinction between monitoring ML training instability and scanning software packages for known security vulnerabilities.","rubric":"Differentiate runtime loss/gradients from CVE and supply-chain scanning"}
+{"id":"q8","prompt":"How would you decide between two fine-tuned models whose validation losses differ by less than one millionth?","rubric":"Avoid strong quality conclusions; request larger independent evaluation"}

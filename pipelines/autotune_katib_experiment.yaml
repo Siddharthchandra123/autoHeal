@@ -1,0 +1,81 @@
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  name: autotune-ai-cpu-hpo
+  namespace: kubeflow
+  labels:
+    app.kubernetes.io/part-of: autotune-ai
+    autotune.ai/phase: '8'
+spec:
+  parallelTrialCount: 2
+  maxTrialCount: 8
+  maxFailedTrialCount: 2
+  objective:
+    type: minimize
+    objectiveMetricName: val_loss
+  algorithm:
+    algorithmName: random
+  parameters:
+  - name: learning_rate
+    parameterType: double
+    feasibleSpace:
+      min: 5e-05
+      max: '0.001'
+  - name: lora_dropout
+    parameterType: double
+    feasibleSpace:
+      min: '0.02'
+      max: '0.25'
+  - name: weight_decay
+    parameterType: double
+    feasibleSpace:
+      min: '0.0'
+      max: '0.08'
+  metricsCollectorSpec:
+    collector:
+      kind: StdOut
+  trialTemplate:
+    primaryContainerName: training
+    trialParameters:
+    - name: learningRate
+      description: learning rate
+      reference: learning_rate
+    - name: loraDropout
+      description: lora dropout
+      reference: lora_dropout
+    - name: weightDecay
+      description: weight decay
+      reference: weight_decay
+    trialSpec:
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        backoffLimit: 0
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+            - name: training
+              image: registry.example.com/autotune-ai:0.14.0
+              command:
+              - python
+              - -m
+              - autotune.katib_trial
+              args:
+              - --backend
+              - mock
+              - --config
+              - /app/config/lora_public_cpu.yaml
+              - --learning-rate
+              - ${trialParameters.learningRate}
+              - --lora-dropout
+              - ${trialParameters.loraDropout}
+              - --weight-decay
+              - ${trialParameters.weightDecay}
+              resources:
+                requests:
+                  cpu: '1'
+                  memory: 2Gi
+                limits:
+                  cpu: '2'
+                  memory: 4Gi

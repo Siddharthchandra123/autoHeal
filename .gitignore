@@ -16,3 +16,6 @@ outputs/
 *.pt
 *.pth
 .env.local
+
+# Local Knowledge Engine corpus (may contain private uploaded documents)
+knowledge_store/

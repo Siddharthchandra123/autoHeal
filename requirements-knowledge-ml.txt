@@ -1,0 +1,4 @@
+# Optional CPU semantic indexing dependencies. Model files are downloaded only
+# when POST /api/knowledge/index is explicitly invoked.
+numpy>=1.26,<3
+sentence-transformers>=3.0,<6

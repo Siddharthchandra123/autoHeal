@@ -1,4 +1,4 @@
-@page { size: A4; margin: 16mm 16mm 18mm 16mm; @bottom-left { content: "AutoTune AI  |  Living Handbook v0.8.2"; font-size: 8pt; color: #64748b; } @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size:8pt; color: #64748b; } }
+@page { size: A4; margin: 16mm 16mm 18mm 16mm; @bottom-left { content: "AutoTune AI  |  Living Handbook v0.14.0"; font-size: 8pt; color: #64748b; } @bottom-right { content: "Page " counter(page) " / " counter(pages); font-size:8pt; color: #64748b; } }
 @font-face { font-family: "DejaVu Sans"; src: local("DejaVu Sans"); }
 html { font-family: "DejaVu Sans", Arial, sans-serif; color: #1d2939; font-size: 9.1pt; }
 body { line-height: 1.46; }

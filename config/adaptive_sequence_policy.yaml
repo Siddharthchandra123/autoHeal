@@ -1,0 +1,17 @@
+schema: autotune-adaptive-sequence-v1
+strategy: profile_and_quarantine
+max_length: model_config
+measure_after_chat_template: true
+preserve_assistant_response: true
+automatic_truncation: false
+automatic_semantic_splitting: false
+overflow:
+  context: quarantine_for_review
+  response: quarantine_for_review
+  mixed: quarantine_for_review
+  malformed: quarantine_for_review
+audit:
+  source_sha256: true
+  record_source_line: true
+  preserve_source_row: true
+  write_manifest: true

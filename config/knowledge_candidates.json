@@ -1,0 +1,65 @@
+{
+  "schema": "autotune-knowledge-candidates-v1",
+  "description": "Small open-weight instruction models for sequential CPU LoRA trials. Candidate choice must be re-evaluated on the user's domain data.",
+  "candidates": [
+    {
+      "id": "qwen3-0.6b",
+      "model": "Qwen/Qwen3-0.6B",
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ],
+      "chat_template_kwargs": {
+        "enable_thinking": false
+      },
+      "device": "cpu",
+      "quantization": "none",
+      "enabled": true
+    },
+    {
+      "id": "qwen2.5-0.5b-instruct",
+      "model": "Qwen/Qwen2.5-0.5B-Instruct",
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ],
+      "chat_template_kwargs": {},
+      "device": "cpu",
+      "quantization": "none",
+      "enabled": true
+    },
+    {
+      "id": "smollm2-360m-instruct",
+      "model": "HuggingFaceTB/SmolLM2-360M-Instruct",
+      "target_modules": [
+        "q_proj",
+        "v_proj"
+      ],
+      "chat_template_kwargs": {},
+      "device": "cpu",
+      "quantization": "none",
+      "enabled": true
+    }
+  ],
+  "defaults": {
+    "max_length": 1024,
+    "max_steps": 100,
+    "epochs": 3,
+    "eval_steps": 2,
+    "batch_size": 1,
+    "gradient_accumulation_steps": 1,
+    "lora_r": 8,
+    "lora_alpha": 16,
+    "lora_dropout": 0.05,
+    "learning_rates": [
+      0.0002,
+      0.0001
+    ],
+    "max_test_examples": 100,
+    "minimum_token_f1": 0.3,
+    "minimum_improvement": 0.02,
+    "minimum_train_rows": 100,
+    "minimum_validation_rows": 20,
+    "minimum_test_rows": 20
+  }
+}

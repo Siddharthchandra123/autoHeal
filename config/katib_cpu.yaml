@@ -1,0 +1,26 @@
+# Phase 8 starter spec. The default worker is SYNTHETIC; switch to hf only
+# after building/pushing an image with requirements-real-cpu.txt and mounting
+# a licensed, immutable model + dataset configuration.
+name: autotune-ai-cpu-hpo
+namespace: kubeflow
+algorithm: random
+objective: val_loss
+direction: minimize
+max_trials: 8
+parallel_trials: 2
+max_failed_trials: 2
+backend: mock
+# For backend: hf, set workspace_pvc to a pre-created claim containing
+# /data/train.jsonl and /data/validation.jsonl; the worker writes /runs/katib.
+image: registry.example.com/autotune-ai:0.14.0
+config_path: /app/config/lora_public_cpu.yaml
+parameters:
+  learning_rate:
+    min: 0.00005
+    max: 0.001
+  lora_dropout:
+    min: 0.02
+    max: 0.25
+  weight_decay:
+    min: 0.0
+    max: 0.08

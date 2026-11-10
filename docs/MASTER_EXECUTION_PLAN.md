@@ -495,3 +495,46 @@ This documentation-only update clarifies what to say in an interview: AutoTune A
 **Acceptance evidence required:** unit tests, malicious fixtures, a real scanner execution report, audit provenance, and user Windows verification. Merely describing a scanner or installing it is not the same as integrating it.
 
 No source code changes or new test results in this checkpoint.
+
+
+---
+
+# v0.12.0 - Phase 7 Knowledge Engine delivery checkpoint (2026-11-04)
+
+## Completed source milestones
+
+| Workstream | Current state | Exit caveat |
+|---|---|---|
+| 7A ingestion | Implemented; TXT/MD/CSV/JSON/JSONL/PDF/DOCX, hashes, SQLite, chunking | OCR for image PDFs is not present |
+| 7B retrieval | FTS5 lexical, optional local sentence-transformer embeddings, hybrid RRF | Model download/index operation not live-tested |
+| 7C RAG | Local Ollama answers with exact quote + chunk ID verification | Lexical overlap is not entailment; Ollama live call unverified |
+| 7D SFT data | Grounded Q/A generator, regex hygiene, source-document-disjoint split, messages JSONL, response-only loss | Basic PII detection; generated content still needs review |
+| 7E orchestration | Three-model sequential registry, pinned revisions, two LR trials, validation-based token-F1 filter plus a single final test run for the selected candidate, no auto-promotion | No real candidate training/benchmark executed in this build |
+| 7F dashboard | Next.js page and API job polling in source | npm install timed out; typecheck/build/browser acceptance pending |
+
+## Build validation
+
+`PYTHONPATH=. pytest -q`: **338 passed in 9.31 seconds** in the build environment. That result covers automated Python contracts; it does not prove the user Windows runtime, external Ollama/Hugging Face downloads, model training quality, GGUF conversion or browser UI.
+
+## Architecture / operating principles
+
+1. Keep RAG and fine-tuning distinct: RAG retrieves changing facts; SFT teaches desired task/response behaviour.
+2. Keep source documents disjoint between train, validation and held-out test.
+3. Validate exact evidence quotes and reject weakly supported answer pairs, but retain human review for generated datasets.
+4. Use response-only loss masking and model-specific chat templates.
+5. Run candidate trials sequentially for the CPU-first baseline; pin immutable revisions.
+6. Evaluate candidates on the same held-out domain examples; token F1 is a preliminary lexical screen, not semantic correctness.
+7. If no candidate passes, record `NO_QUALIFIED_MODEL`; do not lower gates or force a winner.
+8. No production auto-promotion. Require human/domain, privacy/security and safety approval.
+9. Run API on `127.0.0.1` only; prototype has no authentication.
+
+## Next acceptance actions on the user's Windows system
+
+1. Extract v0.12.0 to a fresh folder; preserve existing project outputs, `.venv*`, MLflow DB and adapter artifacts.
+2. Execute `run_phase7.ps1`; verify `/api/knowledge/health`, upload/list a small text file, and lexical search.
+3. Start Ollama locally; verify Q/A generation and dataset manifest with at least four distinct source documents.
+4. Optionally install semantic dependencies and explicitly build/index embeddings.
+5. Run orchestrator preflight; inspect all data-quality gate issues and candidate config plans.
+6. Execute only one candidate first on CPU with enough RAM/disk; verify pinned revision, training receipts and held-out comparison.
+7. Run npm install/typecheck/build and browser acceptance on Windows; capture failures or results.
+8. Human-review scorecards and source data before model export; production deployment remains blocked until a broader independent evaluation, security hardening, authentication and monitoring exist.
