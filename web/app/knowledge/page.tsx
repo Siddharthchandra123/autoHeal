@@ -6,7 +6,7 @@ type DocumentRow = {id:string; filename:string; file_type:string; bytes:number; 
 type SearchRow = {chunk_id:string; source_file:string; chunk_index:number; char_start?:number; char_end?:number; text:string; score:number; method:string};
 type DatasetRow = {path:string; counts:Record<string,number>; source_disjoint:boolean; source_unit_kind?:'document'|'record'; created_at_utc:string};
 type GenerationJob = {job_id:string; status:string; stage?:string; progress?:Record<string,any>; result?:any; error?:{type:string;message:string}};
-type Job = {job_id:string; mode:string; status:string; result?:any; error?:{type:string;message:string}};
+type Job = {job_id:string; mode:string; status:string; stage?:string; output_dir?:string; python_executable?:string; max_candidates?:number|null; log_tail?:string[]; result?:any; error?:{type:string;message:string}};
 const API = process.env.NEXT_PUBLIC_KNOWLEDGE_API || 'http://127.0.0.1:8010';
 const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
 
@@ -20,6 +20,7 @@ export default function KnowledgeEnginePage() {
   const [file,setFile] = useState<File|null>(null);
   const [ollamaModel,setOllamaModel] = useState('qwen2.5:0.5b');
   const [job,setJob] = useState<Job|null>(null);
+  const [maxCandidates,setMaxCandidates] = useState('1');
   const [generationJob,setGenerationJob] = useState<GenerationJob|null>(null);
   const [preview,setPreview] = useState<any|null>(null);
   const [busy,setBusy] = useState('');
@@ -126,9 +127,9 @@ export default function KnowledgeEnginePage() {
     catch(e){setError(String(e));} finally{setBusy('');}
   }
   async function runJob(dataset:DatasetRow,mode:'preflight'|'execute') {
-    if(mode==='execute' && !window.confirm('This will download model weights and fine-tune up to three Hugging Face models sequentially on CPU. It may use substantial RAM, CPU and disk. Continue?')) return;
+    if(mode==='execute' && !window.confirm(`This will download model weights and fine-tune ${maxCandidates} Hugging Face model candidate(s) sequentially on CPU (two learning-rate trials per candidate). It may use substantial RAM, CPU and disk. Continue?`)) return;
     setBusy(mode);setError('');setNotice('');
-    try {const datasetId=dataset.path.split(/[\\/]/).pop();const j=await request('/api/knowledge/training/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataset_id:datasetId,mode,allow_cpu:mode==='execute',allow_small_data:false,max_candidates:3})});setJob(j);setNotice(`Training job ${j.job_id} ${j.status}.`);}
+    try {const datasetId=dataset.path.split(/[\\/]/).pop();const j=await request('/api/knowledge/training/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dataset_id:datasetId,mode,allow_cpu:mode==='execute',allow_small_data:false,max_candidates:Number(maxCandidates)})});setJob(j);setNotice(`Training job ${j.job_id} ${j.status}.`);}
     catch(e){setError(String(e));} finally{setBusy('');}
   }
 
@@ -163,6 +164,7 @@ export default function KnowledgeEnginePage() {
     <section className="panel knowledgePanel">
       <div className="section-heading"><h2>3. Build a fine-tuning dataset</h2><span>Direct SFT import or grounded generation</span></div>
       <div className="searchRow"><input value={ollamaModel} onChange={e=>setOllamaModel(e.target.value)} placeholder="Local Ollama model tag"/><button disabled={!documents.length||!ollamaModel.trim()||!!busy||!!(generationJob&&['queued','running'].includes(generationJob.status))} onClick={generateDataset}>{busy==='dataset'||(generationJob&&['queued','running'].includes(generationJob.status))?'Generating…':'Build fine-tuning dataset'}</button></div>
+      <div className="searchRow"><label className="muted small" htmlFor="candidate-count">Model candidates per run</label><select id="candidate-count" value={maxCandidates} onChange={e=>setMaxCandidates(e.target.value)}><option value="1">1 candidate (recommended for CPU)</option><option value="2">2 candidates</option><option value="3">3 candidates</option></select></div>
       <p className="muted small">Structured instruction/response JSONL (including Dolly) is imported directly without Ollama. Other uploaded documents use local Ollama to generate answers with exact source quotes. Splits are disjoint by source record for imported datasets or by source document for generated Q&A.</p>
       <div className="datasetList">{datasets.map((d,i)=><div className="datasetRow" key={d.path}><div><b>{d.path.split(/[\\/]/).pop()}</b><small>Train {d.counts?.train??0} · Validation {d.counts?.validation??0} · Test {d.counts?.test??0} · {d.source_unit_kind==='record'?'source-record':'source-document'} disjoint {String(d.source_disjoint)}</small></div><div className="datasetButtons"><button className="secondary" disabled={!!busy} onClick={()=>previewDataset(d,'train')}>Preview train</button><button className="secondary" disabled={!!busy} onClick={()=>previewDataset(d,'validation')}>Preview validation</button><button className="secondary" disabled={!!busy} onClick={()=>previewDataset(d,'test')}>Preview test</button><button className="secondary" disabled={!!busy} onClick={()=>runJob(d,'preflight')}>Preflight</button><button disabled={!!busy||!d.source_disjoint} onClick={()=>runJob(d,'execute')}>Fine-tune models</button></div></div>)}{!datasets.length&&!(generationJob&&['queued','running'].includes(generationJob.status))&&<div className="empty">No datasets yet. Upload a supervised JSONL dataset such as Dolly for direct import, or upload at least four distinct knowledge documents for Ollama-grounded Q&A generation.</div>}</div>
       {generationJob&&<div className="answerCard generationJobCard"><div className="resultMeta"><b>Dataset build · {generationJob.stage||generationJob.status}</b><span className={`status ${generationJob.status==='completed'?'ok':generationJob.status==='failed'?'bad':''}`}>{generationJob.status}</span></div>
@@ -176,8 +178,11 @@ export default function KnowledgeEnginePage() {
     </section>
 
     {job&&<section className="panel knowledgePanel"><div className="section-heading"><h2>4. Orchestration job</h2><span className={`status ${job.status==='completed'?'ok':job.status==='failed'?'bad':''}`}>{job.status}</span></div>
-      <p className="muted small">Job ID {job.job_id} · mode {job.mode}</p>
+      <p className="muted small">Job ID {job.job_id} · mode {job.mode} · stage {job.stage||job.status} · candidates {job.max_candidates??'default'}</p>
+      {job.output_dir&&<p className="muted small">Output: {job.output_dir}</p>}
+      {job.python_executable&&<p className="muted small">Python: {job.python_executable}</p>}
       {job.error&&<div className="errorBox">{job.error.type}: {job.error.message}</div>}
+      {!!job.log_tail?.length&&<details open><summary>Training process logs (latest {job.log_tail.length} lines)</summary><pre className="jsonResult">{job.log_tail.join('\n')}</pre></details>}
       {job.result&&<pre className="jsonResult">{JSON.stringify(job.result,null,2)}</pre>}
     </section>}
     <p className="disclaimer">Model training is an explicit user action. No candidate is automatically promoted. Held-out token-F1 is an initial objective filter, not a safety or production certification.</p>

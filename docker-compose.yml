@@ -1,0 +1,130 @@
+
+name: autotune-ai
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.17.2
+    container_name: autotune-mlflow
+    command:
+      - python
+      - -m
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5000"
+      - --backend-store-uri
+      - sqlite:////mlflow/mlflow.db
+      - --default-artifact-root
+      - /mlflow/artifacts
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - autotune-net
+    restart: unless-stopped
+
+  knowledge-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: autotune-knowledge-api
+    command:
+      - python
+      - -m
+      - uvicorn
+      - autotune.knowledge_engine:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      AUTOTUNE_MLFLOW_URI: http://mlflow:5000
+      PYTHONUNBUFFERED: "1"
+    expose:
+      - "8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    networks:
+      - autotune-net
+    restart: unless-stopped
+
+  viewer-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: autotune-mlflow-viewer
+    command:
+      - python
+      - -m
+      - uvicorn
+      - autotune.viewer_api:create_app
+      - --factory
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8064"
+    environment:
+      AUTOTUNE_MLFLOW_URI: http://mlflow:5000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      PYTHONUNBUFFERED: "1"
+    expose:
+      - "8064"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    networks:
+      - autotune-net
+    restart: unless-stopped
+
+  api-gateway:
+    image: nginx:1.27-alpine
+    container_name: autotune-api-gateway
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - knowledge-api
+      - viewer-api
+    networks:
+      - autotune-net
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: ../Dockerfile.web
+    container_name: autotune-web
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      NODE_ENV: production
+      AUTOTUNE_VIEWER_API: http://127.0.0.1:8000
+      NEXT_PUBLIC_AUTOTUNE_API_URL: http://127.0.0.1:8000
+    depends_on:
+      - api-gateway
+    networks:
+      - autotune-net
+    restart: unless-stopped
+
+networks:
+  autotune-net:
+    driver: bridge
+
+volumes:
+  mlflow-data:

@@ -1,4 +1,4 @@
-"""Local, read-only MLflow experiment viewer for AutoTune AI Phase 6B.
+﻿"""Local, read-only MLflow experiment viewer for AutoTune AI Phase 6B.
 
 This module cannot submit training, deploy models, download artifacts or make
 arbitrary URL requests. Backend MLflow target is fixed at application startup.
@@ -35,23 +35,26 @@ TAG_NAMES = frozenset({
 MAX_METRIC_POINTS = 250
 
 
-def check_local_uri(uri: str) -> str:
-    """No SSRF surface: permit only explicit numeric loopback HTTP MLflow URL."""
-    if not isinstance(uri, str):
-        raise ValueError('Tracking URI must be a string')
-    p = urlsplit(uri)
-    if p.scheme != 'http' or p.hostname != '127.0.0.1':
-        raise ValueError('Viewer only accepts http://127.0.0.1:<port> for local development')
-    if p.username or p.password or p.query or p.fragment or p.path not in ('', '/'):
-        raise ValueError('Tracking URI cannot contain credentials, paths, query or fragment')
-    try:
-        port = p.port
-    except ValueError as exc:
-        raise ValueError('Invalid MLflow port') from exc
-    if not port or not (1 <= port <= 65535):
-        raise ValueError('Tracking URI must specify a valid port')
-    return f'http://127.0.0.1:{port}'
+from urllib.parse import urlparse
 
+from urllib.parse import urlparse
+
+def check_local_uri(uri: str) -> str:
+    """Validate a local or trusted Docker-internal MLflow tracking URI."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(uri)
+    if parsed.scheme != "http":
+        raise ValueError("Only HTTP tracking URIs are supported")
+    if parsed.username or parsed.password:
+        raise ValueError("Credentials are not allowed in tracking URI")
+    if parsed.hostname not in {"127.0.0.1", "localhost", "mlflow"}:
+        raise ValueError(f"Tracking URI host is not allowed: {parsed.hostname}")
+    if parsed.port is None or not (1 <= parsed.port <= 65535):
+        raise ValueError("Tracking URI must specify a valid port")
+    if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+        raise ValueError("Tracking URI must not contain a path, query, or fragment")
+    return uri.rstrip("/")
 
 def _clean_float(value: Any) -> float | None:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -186,3 +189,4 @@ def create_app(*, client: Any = None, tracking_uri: str | None = None,
 
 
 app = create_app()
+

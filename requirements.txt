@@ -1,2 +1,26 @@
+
 PyYAML>=6.0,<7
 pytest>=8,<10
+
+# API and tracking
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+mlflow>=3.17.2,<4
+openai>=1.60,<3
+
+# Data and ML
+numpy>=1.26,<3
+pandas>=2.1,<3
+torch>=2.4,<3
+transformers>=4.50,<6
+peft>=0.15
+accelerate>=1.2
+datasets>=3,<5
+safetensors>=0.5
+huggingface_hub>=0.28
+sentence-transformers>=3.0,<6
+
+# Other application dependencies
+weasyprint>=63,<70
+streamlit>=1.40,<2
+kfp[kubernetes]>=2.5,<3

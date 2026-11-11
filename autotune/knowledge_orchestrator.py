@@ -23,6 +23,7 @@ import yaml
 from .config import config_sha256
 from .lora_contract import LoraContractError, make_plan, _write_json_atomic
 from .model_evaluator import evaluate_candidate
+from .adaptive_data import prepare_jsonl_dataset
 
 BASE = Path(__file__).resolve().parents[1]
 REGISTRY = BASE / 'config' / 'knowledge_candidates.json'
@@ -139,6 +140,12 @@ def _pin_revision(model_id: str) -> str:
     return sha
 
 
+def _load_tokenizer(model_id: str, revision: str):
+    """Load the exact fast tokenizer revision used by a candidate."""
+    from transformers import AutoTokenizer
+    return AutoTokenizer.from_pretrained(model_id, revision=revision, use_fast=True)
+
+
 def _make_config(candidate: dict, defaults: dict, data: dict, revision: str,
                  learning_rate: float, output: Path) -> Path:
     cfg = yaml.safe_load(BASE_CONFIG.read_text(encoding='utf-8'))
@@ -230,9 +237,41 @@ def execute(dataset_dir: str | Path, *, output_dir: str | Path = 'outputs/knowle
             revision = _pin_revision(candidate['model'])
             candidate_record['revision'] = revision
             _append(journal, {'event':'candidate_started','candidate':candidate['id'],'revision':revision})
+            # Token lengths depend on the exact model tokenizer and chat template.
+            # Prepare an immutable, model-specific dataset before planning/training.
+            tokenizer = _load_tokenizer(candidate['model'], revision)
+            adaptive_dir = out / 'prepared_data' / candidate['id']
+            adaptive_manifest = prepare_jsonl_dataset(
+                data['root'], adaptive_dir, tokenizer,
+                max_length=int(defaults['max_length']),
+                chat_template_kwargs=candidate.get('chat_template_kwargs', {}),
+            )
+            prepared_data = _dataset_paths(adaptive_dir)
+            prepared_issues = [
+                f"{split}: {prepared_data['counts'][split]} rows; minimum {minimum}"
+                for split, minimum in requirements.items()
+                if prepared_data['counts'][split] < minimum
+            ]
+            if prepared_issues:
+                raise ValueError(
+                    'Adaptive preparation left insufficient usable rows: '
+                    + '; '.join(prepared_issues)
+                )
+            candidate_record['adaptive_preparation'] = {
+                'manifest': str(adaptive_dir / 'adaptive_manifest.json'),
+                'training_ready': adaptive_manifest['training_ready'],
+                'dataset_counts': prepared_data['counts'],
+                'quarantined_counts': {
+                    split: adaptive_manifest['splits'][split]['quarantined_rows']
+                    for split in ('train', 'validation', 'test')
+                },
+            }
+            candidate_validation_file = str(prepared_data['validation'])
+            candidate_test_file = str(prepared_data['test'])
+            candidate_record['prepared_test_file'] = candidate_test_file
             trained = []
             for index, lr in enumerate(defaults['learning_rates'], 1):
-                cfg_path = _make_config(candidate, defaults, data, revision, float(lr), out)
+                cfg_path = _make_config(candidate, defaults, prepared_data, revision, float(lr), out)
                 plan = make_plan(cfg_path)
                 trial_dir = out / 'runs' / candidate['id'] / f'trial-{index:02d}'
                 trial_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +284,7 @@ def execute(dataset_dir: str | Path, *, output_dir: str | Path = 'outputs/knowle
                 # Select LR/trial using validation only. The held-out test split is
                 # not touched until one architecture has been selected.
                 evaluation = evaluate_candidate(model_id=candidate['model'], revision=revision,
-                    adapter_dir=run['adapter_dir'], test_file=validation_file,
+                    adapter_dir=run['adapter_dir'], test_file=candidate_validation_file,
                     max_examples=int(defaults['max_test_examples']),
                     chat_template_kwargs=candidate.get('chat_template_kwargs',{}))
                 trial = {'trial':index,'learning_rate':float(lr),'best_val_loss':run['best_val_loss'],
@@ -284,7 +323,7 @@ def execute(dataset_dir: str | Path, *, output_dir: str | Path = 'outputs/knowle
             test_evaluation = evaluate_candidate(
                 model_id=validation_winner['model'],
                 revision=validation_winner['revision'],
-                adapter_dir=validation_winner['best_adapter_dir'], test_file=test_file,
+                adapter_dir=validation_winner['best_adapter_dir'], test_file=validation_winner['prepared_test_file'],
                 max_examples=int(defaults['max_test_examples']),
                 chat_template_kwargs=next((c.get('chat_template_kwargs', {}) for c in candidates if c['id']==validation_winner['candidate_id']), {}))
             test_candidate_f1 = float(test_evaluation['candidate']['mean_token_f1'])

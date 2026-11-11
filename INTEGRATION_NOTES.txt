@@ -1,0 +1,27 @@
+AutoTune AI Adaptive Sequence integration patch
+
+Replace the matching files in your project with the files in this archive.
+The patch:
+- loads the tokenizer pinned to each candidate revision during execute mode;
+- profiles the rendered chat-template sequence before make_plan/run_lora;
+- copies fitting records unchanged;
+- quarantines oversized or malformed records without truncation;
+- writes an adaptive audit manifest and a derived dataset_manifest.json;
+- preserves source_ids/source-disjoint split validation;
+- routes train/validation/test to prepared split files;
+- evaluates the held-out prepared test split only once after selection.
+
+Preflight remains offline and does not download tokenizers; actual tokenizer
+profiling happens during explicit --execute.
+
+Semantic splitting is intentionally not automatic. Quarantined rows need
+task-aware review; this patch does not synthesize or truncate answers.
+
+Focused validation in this environment:
+10 passed:
+- tests/test_adaptive_sequence.py
+- tests/test_knowledge_orchestrator_v012.py
+
+The uploaded source ZIP omitted sample_data/train.jsonl and related fixtures
+referenced by several older tests, so the entire repository suite could not
+be validated from this archive. Re-run the full suite in the user's project.

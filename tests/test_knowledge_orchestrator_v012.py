@@ -6,6 +6,13 @@ import pytest
 from autotune.knowledge_orchestrator import _dataset_paths, preflight, execute
 
 
+
+class FakeTokenizer:
+    def apply_chat_template(self, messages, tokenize=False, add_generation_prompt=False, **kwargs):
+        return "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+    def __call__(self, text, add_special_tokens=False, truncation=False):
+        return {"input_ids": text.split()}
+
 def make_dataset(root: Path, *, leak=False):
     root.mkdir()
     rows = {}
@@ -98,6 +105,7 @@ def execute_with_mocked_models(tmp_path, monkeypatch, *, test_passes=True):
     reg = tmp_path / 'registry.json'
     reg.write_text(json.dumps(registry), encoding='utf-8')
     monkeypatch.setattr(ko, '_pin_revision', lambda model: 'a' * 40)
+    monkeypatch.setattr(ko, '_load_tokenizer', lambda model, revision: FakeTokenizer())
     def fake_train(config, output, allow_cpu=False):
         Path(output).mkdir(parents=True, exist_ok=True)
         return {'ok':True,'adapter_dir':str(Path(output)/'adapter'),'best_val_loss':1.0}

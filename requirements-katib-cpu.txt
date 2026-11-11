@@ -1,8 +1,0 @@
--r requirements.txt
-numpy>=1.26,<3
-transformers>=4.50,<6
-peft>=0.15
-accelerate>=1.2
-datasets>=3,<5
-safetensors>=0.5
-huggingface_hub>=0.28

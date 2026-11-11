@@ -1,5 +1,0 @@
-# Install this only when running Hugging Face fine-tuning/evaluation.
-# On Windows CPU-only systems, install the PyTorch CPU wheel first if pip's
-# default resolver selects an unsuitable accelerator build; then install this.
--r requirements-lora.txt
-torch>=2.4,<3

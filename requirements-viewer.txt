@@ -1,4 +1,0 @@
-# Optional read-only experiment viewer; MLflow server remains separate.
-fastapi>=0.115,<1
-uvicorn>=0.30,<1
-mlflow>=3.17.2,<4

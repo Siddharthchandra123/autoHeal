@@ -1,8 +1,0 @@
--r requirements.txt
-# Install a compatible PyTorch wheel for your Python, OS, and intended backend.
-# For the Phase 5 Windows CPU demo, use:
-#   python -m pip install torch
-# Do not install CUDA or ROCm wheels unless the hardware/driver stack supports them.
-torch>=2.3
-# Fix: torch may warn "Failed to initialize NumPy" if it is absent.
-numpy>=1.26,<3
