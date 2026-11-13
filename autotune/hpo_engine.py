@@ -1,4 +1,4 @@
-import json, os, traceback
+import json, math, os, traceback
 from datetime import datetime, timezone
 from pathlib import Path
 import yaml
@@ -20,6 +20,75 @@ def _event(path, event, **kwargs):
         f.write(json.dumps({"time": datetime.now(timezone.utc).isoformat(),
                             "event": event, **kwargs}, sort_keys=True) + "\n")
 
+
+def _read_evaluation_evidence(path, min_evaluations):
+    """Validate paired train/validation observations for HPO eligibility."""
+    rows = []
+    previous_step = 0
+
+    if not path.is_file():
+        return {
+            "qualified": False,
+            "evaluation_count": 0,
+            "required_evaluations": min_evaluations,
+            "reason": "metrics.jsonl is missing",
+        }
+
+    for line_number, line in enumerate(path.read_text("utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid metrics.jsonl line {line_number}") from exc
+
+        if not isinstance(row, dict):
+            raise ValueError(f"Metric line {line_number} must be an object")
+
+        step = row.get("step")
+        if isinstance(step, bool) or not isinstance(step, int) or step < 1:
+            raise ValueError(f"Invalid evaluation step at line {line_number}")
+        if step <= previous_step:
+            raise ValueError("Evaluation steps must be strictly increasing")
+
+        for name in ("train_loss", "val_loss"):
+            value = row.get(name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+            ):
+                raise ValueError(f"Invalid {name} at metrics.jsonl line {line_number}")
+
+        rows.append({
+            "step": step,
+            "train_loss": float(row["train_loss"]),
+            "val_loss": float(row["val_loss"]),
+        })
+        previous_step = step
+
+    count = len(rows)
+    latest = rows[-1] if rows else None
+
+    return {
+        "qualified": count >= min_evaluations,
+        "evaluation_count": count,
+        "required_evaluations": min_evaluations,
+        "best_val_loss": min((r["val_loss"] for r in rows), default=None),
+        "latest_train_loss": latest["train_loss"] if latest else None,
+        "latest_val_loss": latest["val_loss"] if latest else None,
+        "latest_generalization_gap": (
+            latest["val_loss"] - latest["train_loss"] if latest else None
+        ),
+        "evaluation_steps": [r["step"] for r in rows],
+        "reason": (
+            "minimum evaluation evidence satisfied"
+            if count >= min_evaluations
+            else "minimum evaluation evidence not satisfied"
+        ),
+    }
+
+
 def run_hpo(config_path, output, tracking_uri="http://127.0.0.1:5001",
             experiment="AutoTune-AI-MI300X-HPO"):
     config_path, output = Path(config_path).resolve(), Path(output).resolve()
@@ -40,7 +109,9 @@ def run_hpo(config_path, output, tracking_uri="http://127.0.0.1:5001",
         config_sha256=config_sha256(base), model=baseline_plan["model"],
         provider="hpo-grid", train_sha256=baseline_plan["train_sha256"],
         validation_sha256=baseline_plan["validation_sha256"],
-        max_attempts=len(candidates), fault_injected=False)
+        max_attempts=len(candidates), fault_injected=False,
+        controller_name="AutoTune HPO Controller",
+        controller_type="hpo")
 
     events, state = output / "controller_events.jsonl", output / "controller_state.json"
     trials = []
@@ -65,16 +136,49 @@ def run_hpo(config_path, output, tracking_uri="http://127.0.0.1:5001",
                 verify_manifest(adapter, plan, kind="final_adapter")
                 verify_manifest(checkpoint, plan, kind="trainer_checkpoint")
                 score = float(receipt["best_val_loss"])
-                if not (score == score and abs(score) != float("inf")):
+                if not math.isfinite(score):
                     raise RuntimeError("Non-finite validation loss")
-                record = {"trial":i, "status":"valid", "patch":c["patch"],
-                          "best_val_loss":score, "output_dir":str(trial_dir),
-                          "adapter_dir":str(adapter), "best_checkpoint":str(checkpoint)}
+
+                min_evaluations = max(3, int(base["monitor"]["min_evaluations"]))
+                evidence = _read_evaluation_evidence(
+                    trial_dir / "metrics.jsonl", min_evaluations
+                )
+
+                if evidence["qualified"]:
+                    observed_best = evidence["best_val_loss"]
+                    if not math.isclose(
+                        score, observed_best, rel_tol=1e-6, abs_tol=1e-6
+                    ):
+                        raise RuntimeError(
+                            "Trainer best_val_loss does not match recorded "
+                            "evaluation history"
+                        )
+
                 reporter.finish_trial(i, out=trial_dir,
                     receipt_path=trial_dir/"result_receipt.json",
                     checkpoint=checkpoint, score=score, diagnosis=None,
                     fault_injected=False)
-                _event(events, "trial_completed", trial=i, best_val_loss=score)
+
+                record = {
+                    "trial": i,
+                    "status": "valid" if evidence["qualified"] else "insufficient_evidence",
+                    "patch": c["patch"],
+                    "best_val_loss": score,
+                    "output_dir": str(trial_dir),
+                    "adapter_dir": str(adapter),
+                    "best_checkpoint": str(checkpoint),
+                    "evaluation_evidence": evidence,
+                }
+
+                _event(
+                    events,
+                    "trial_completed" if evidence["qualified"] else "trial_insufficient_evidence",
+                    trial=i,
+                    best_val_loss=score,
+                    evaluation_count=evidence["evaluation_count"],
+                    required_evaluations=evidence["required_evaluations"],
+                    latest_generalization_gap=evidence["latest_generalization_gap"],
+                )
             except BaseException:
                 reporter.fail_trial(i)
                 record = {"trial":i, "status":"failed", "patch":c["patch"],

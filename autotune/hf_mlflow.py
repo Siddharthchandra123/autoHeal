@@ -36,10 +36,19 @@ class HFMLflowReporter:
 
     def start_controller(self, *, config_sha256: str, model: str, provider: str,
                          train_sha256: str, validation_sha256: str,
-                         max_attempts: int, fault_injected: bool) -> str:
+                         max_attempts: int, fault_injected: bool,
+                         controller_name: str = 'AutoTune CPU HF self-healing',
+                         controller_type: str = 'self_healing') -> str:
+        if not isinstance(controller_name, str) or not controller_name.strip():
+            raise ValueError('A nonempty MLflow controller name is required')
+        if not isinstance(controller_type, str) or not controller_type.strip():
+            raise ValueError('A nonempty MLflow controller type is required')
+
         run = self.client.create_run(self.experiment_id, tags={
-            'mlflow.runName': 'AutoTune CPU HF self-healing',
-            'autotune.role': 'controller', 'autotune.fault_injection': str(fault_injected).lower(),
+            'mlflow.runName': controller_name,
+            'autotune.role': 'controller',
+            'autotune.controller_type': controller_type,
+            'autotune.fault_injection': str(fault_injected).lower(),
             'autotune.promoted': 'false',
         })
         self.parent_id = run.info.run_id
